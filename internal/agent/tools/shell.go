@@ -5,36 +5,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/hammie/rubrduck/internal/ai"
+	"github.com/hammie/rubrduck/internal/sandbox"
 	"github.com/rs/zerolog/log"
 )
 
 // ShellTool provides shell command execution capabilities
 type ShellTool struct {
-	basePath    string
-	allowedCmds []string
-	blockedCmds []string
-	timeout     time.Duration
+	basePath       string
+	allowedCmds    []string
+	blockedCmds    []string
+	timeout        time.Duration
+	sandbox        sandbox.Sandbox
+	sandboxEnabled bool
+	basePolicy     sandbox.Policy
 }
 
 // NewShellTool creates a new shell tool instance
-func NewShellTool(basePath string) *ShellTool {
+func NewShellTool(basePath string, policy sandbox.Policy) *ShellTool {
+	sandboxInstance, err := sandbox.NewSandbox()
+	sandboxEnabled := err == nil
+
 	return &ShellTool{
-		basePath: basePath,
-		allowedCmds: []string{
-			"ls", "cat", "head", "tail", "grep", "find", "wc", "sort", "uniq",
-			"echo", "pwd", "whoami", "date", "ps", "top", "df", "du",
-			"git", "go", "npm", "yarn", "python", "node", "make",
-		},
-		blockedCmds: []string{
-			"rm", "rmdir", "del", "format", "mkfs", "dd", "shred",
-			"sudo", "su", "chmod", "chown", "passwd", "useradd",
-			"wget", "curl", "nc", "netcat", "ssh", "scp", "rsync",
-		},
-		timeout: 30 * time.Second,
+		basePath:       basePath,
+		allowedCmds:    policy.AllowedCommands,
+		blockedCmds:    policy.BlockedCommands,
+		timeout:        time.Duration(policy.MaxCPUTime) * time.Second,
+		sandbox:        sandboxInstance,
+		sandboxEnabled: sandboxEnabled,
+		basePolicy:     policy,
 	}
 }
 
@@ -189,6 +192,63 @@ func (s *ShellTool) sanitizePath(path string) (string, error) {
 
 // executeCommand executes the shell command and captures output
 func (s *ShellTool) executeCommand(ctx context.Context, command, workDir string) (string, error) {
+	// Use sandbox if available
+	if s.sandboxEnabled && s.sandbox != nil {
+		return s.executeWithSandbox(ctx, command, workDir)
+	}
+
+	// Fallback to original implementation
+	return s.executeWithoutSandbox(ctx, command, workDir)
+}
+
+// executeWithSandbox executes the command using the sandbox
+func (s *ShellTool) executeWithSandbox(ctx context.Context, command, workDir string) (string, error) {
+	// Create sandbox policy
+	policy := s.createSandboxPolicy(workDir)
+
+	// Split command into parts
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return "", fmt.Errorf("invalid command")
+	}
+
+	cmd := parts[0]
+	args := parts[1:]
+
+	// Execute in sandbox
+	result, err := s.sandbox.Execute(ctx, cmd, args, policy)
+	if err != nil {
+		return "", fmt.Errorf("sandbox execution failed: %w", err)
+	}
+
+	// Build result string
+	var resultStr strings.Builder
+	resultStr.WriteString(fmt.Sprintf("Command: %s\n", command))
+	resultStr.WriteString(fmt.Sprintf("Working Directory: %s\n", workDir))
+	resultStr.WriteString(fmt.Sprintf("Exit Code: %d\n", result.ExitCode))
+	resultStr.WriteString(fmt.Sprintf("Duration: %v\n\n", result.Duration))
+
+	if result.Stdout != "" {
+		resultStr.WriteString("STDOUT:\n")
+		resultStr.WriteString(result.Stdout)
+		resultStr.WriteString("\n")
+	}
+
+	if result.Stderr != "" {
+		resultStr.WriteString("STDERR:\n")
+		resultStr.WriteString(result.Stderr)
+		resultStr.WriteString("\n")
+	}
+
+	if result.Error != nil {
+		return resultStr.String(), fmt.Errorf("command failed: %w", result.Error)
+	}
+
+	return resultStr.String(), nil
+}
+
+// executeWithoutSandbox executes the command without sandbox (original implementation)
+func (s *ShellTool) executeWithoutSandbox(ctx context.Context, command, workDir string) (string, error) {
 	// Create command
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Dir = workDir
@@ -230,6 +290,29 @@ func (s *ShellTool) executeCommand(ctx context.Context, command, workDir string)
 	}
 
 	return result.String(), nil
+}
+
+// createSandboxPolicy creates a sandbox policy for the given working directory
+func (s *ShellTool) createSandboxPolicy(workDir string) sandbox.Policy {
+	// Get absolute paths for the policy
+	absWorkDir, _ := filepath.Abs(workDir)
+	absBasePath, _ := filepath.Abs(s.basePath)
+
+	// Start with the base policy from config
+	policy := s.basePolicy
+
+	// Update paths to be absolute
+	policy.AllowReadPaths = append([]string{absWorkDir, absBasePath}, policy.AllowReadPaths...)
+	policy.AllowWritePaths = append([]string{absWorkDir}, policy.AllowWritePaths...)
+
+	// Update command lists
+	policy.AllowedCommands = s.allowedCmds
+	policy.BlockedCommands = s.blockedCmds
+
+	// Set timeout
+	policy.MaxCPUTime = s.timeout
+
+	return policy
 }
 
 // SetAllowedCommands sets the list of allowed commands

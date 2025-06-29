@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/hammie/rubrduck/internal/agent/tools"
 	"github.com/hammie/rubrduck/internal/ai"
 	"github.com/hammie/rubrduck/internal/config"
+	"github.com/hammie/rubrduck/internal/sandbox"
 	"github.com/rs/zerolog/log"
 )
 
@@ -176,7 +178,21 @@ func (a *Agent) registerDefaultTools() {
 	a.RegisterTool("file_operations", fileTool)
 
 	// Register shell execution tool
-	shellTool := tools.NewShellTool(basePath)
+	shellPolicy := sandbox.Policy{
+		AllowReadPaths:  a.config.Sandbox.AllowReadPaths,
+		AllowWritePaths: a.config.Sandbox.AllowWritePaths,
+		BlockPaths:      a.config.Sandbox.BlockPaths,
+		AllowNetwork:    a.config.Sandbox.AllowNetwork,
+		AllowedHosts:    a.config.Sandbox.AllowedHosts,
+		MaxProcesses:    a.config.Sandbox.MaxProcesses,
+		MaxMemoryMB:     a.config.Sandbox.MaxMemoryMB,
+		MaxCPUTime:      time.Duration(a.config.Sandbox.MaxCPUTime) * time.Second,
+		AllowedCommands: a.config.Sandbox.AllowedCommands,
+		BlockedCommands: a.config.Sandbox.BlockedCommands,
+		AllowedEnvVars:  a.config.Sandbox.AllowedEnvVars,
+		BlockedEnvVars:  a.config.Sandbox.BlockedEnvVars,
+	}
+	shellTool := tools.NewShellTool(basePath, shellPolicy)
 	a.RegisterTool("shell_execute", shellTool)
 
 	// Register git operations tool
