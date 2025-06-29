@@ -1,0 +1,126 @@
+{
+  "name": "rubrduck",
+  "displayName": "RubrDuck",
+  "description": "AI-powered coding assistant for VSCode",
+  "version": "0.1.0",
+  "publisher": "rubrduck",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "assistant",
+    "code generation",
+    "rubrduck"
+  ],
+  "icon": "media/icon.png",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rubrduck.chat",
+        "title": "RubrDuck: Open Chat"
+      },
+      {
+        "command": "rubrduck.explain",
+        "title": "RubrDuck: Explain Code"
+      },
+      {
+        "command": "rubrduck.fix",
+        "title": "RubrDuck: Fix Code"
+      },
+      {
+        "command": "rubrduck.generate",
+        "title": "RubrDuck: Generate Code"
+      },
+      {
+        "command": "rubrduck.test",
+        "title": "RubrDuck: Generate Tests"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "rubrduck.explain",
+          "group": "rubrduck",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "rubrduck.fix",
+          "group": "rubrduck",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "RubrDuck",
+      "properties": {
+        "rubrduck.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "RubrDuck API server URL"
+        },
+        "rubrduck.authToken": {
+          "type": "string",
+          "default": "",
+          "description": "Authentication token for RubrDuck API"
+        },
+        "rubrduck.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start RubrDuck server on VSCode startup"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "rubrduck",
+          "title": "RubrDuck",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "rubrduck": [
+        {
+          "id": "rubrduck.chat",
+          "name": "Chat",
+          "type": "webview"
+        },
+        {
+          "id": "rubrduck.history",
+          "name": "History"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "@vscode/test-electron": "^2.3.x",
+    "eslint": "^8.x",
+    "typescript": "^5.3.x"
+  },
+  "dependencies": {
+    "axios": "^1.6.x",
+    "ws": "^8.16.x"
+  }
+} 

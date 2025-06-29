@@ -1,0 +1,168 @@
+# RubrDuck Configuration Example
+# Copy this file to ~/.rubrduck/config.yaml and customize as needed
+
+# Default AI provider to use
+provider: openai
+
+# Default model for the selected provider
+model: gpt-4
+
+# AI Provider Configurations
+providers:
+  openai:
+    name: OpenAI
+    base_url: https://api.openai.com/v1
+    # API key can be set here or via OPENAI_API_KEY environment variable
+    # api_key: your-api-key-here
+    env_key: OPENAI_API_KEY
+
+  azure:
+    name: Azure OpenAI
+    base_url: https://your-resource.openai.azure.com
+    api_version: 2024-02-15-preview
+    env_key: AZURE_API_KEY
+
+  anthropic:
+    name: Anthropic
+    base_url: https://api.anthropic.com/v1
+    env_key: ANTHROPIC_API_KEY
+
+  gemini:
+    name: Google Gemini
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    env_key: GEMINI_API_KEY
+
+  ollama:
+    name: Ollama (Local)
+    base_url: http://localhost:11434/v1
+    # Ollama doesn't require an API key for local usage
+    api_key: ""
+
+# Agent Configuration
+agent:
+  # Approval mode: suggest, auto-edit, or full-auto
+  approval_mode: suggest
+
+  # Enable sandboxing for code execution
+  sandbox_enabled: true
+
+  # Maximum retries for failed operations
+  max_retries: 3
+
+  # Timeout for operations (in seconds)
+  timeout: 300
+
+  # Working directory (defaults to current directory)
+  # working_dir: .
+
+# API Server Configuration (for IDE extensions)
+api:
+  # Enable the API server
+  enabled: false
+
+  # Server port
+  port: 8080
+
+  # Server host
+  host: localhost
+
+  # Authentication token (can be set via RUBRDUCK_AUTH_TOKEN env var)
+  # auth_token: your-secret-token
+
+# Conversation History Configuration
+history:
+  # Maximum number of history entries to keep
+  max_size: 1000
+
+  # Enable conversation history
+  save_history: true
+
+  # Patterns to filter from history (regex)
+  sensitive_patterns:
+    - "password.*=.*"
+    - "api[_-]?key.*=.*"
+    - "token.*=.*"
+
+# TUI (Terminal UI) Configuration
+tui:
+  # Color theme: default, dark, light, or custom
+  theme: default
+
+  # Enable mouse support
+  mouse_enabled: true
+
+  # Show line numbers in code blocks
+  show_line_numbers: true
+
+  # Syntax highlighting style
+  syntax_theme: monokai
+
+# Logging Configuration
+logging:
+  # Log level: debug, info, warn, error
+  level: info
+
+  # Log file path (empty for stderr only)
+  file: ~/.rubrduck/rubrduck.log
+
+  # Max log file size in MB
+  max_size: 10
+
+  # Max number of old log files to keep
+  max_backups: 3
+
+# Tools Configuration
+tools:
+  # Enable specific tools
+  enabled:
+    - file_read
+    - file_write
+    - shell_execute
+    - web_search
+    - git_operations
+
+  # Tool-specific settings
+  shell:
+    # Allowed commands (regex patterns)
+    allowed_commands:
+      - "^ls.*"
+      - "^cat.*"
+      - "^grep.*"
+      - "^find.*"
+      - "^git.*"
+
+    # Blocked commands (takes precedence over allowed)
+    blocked_commands:
+      - "^rm -rf.*"
+      - "^sudo.*"
+      - "^curl.*--output.*"
+
+# Project-specific settings
+project:
+  # Paths to ignore during operations
+  ignore_paths:
+    - node_modules
+    - .git
+    - vendor
+    - dist
+    - build
+    - "*.log"
+    - "*.tmp"
+
+  # File extensions to consider as code
+  code_extensions:
+    - .go
+    - .js
+    - .ts
+    - .py
+    - .java
+    - .cpp
+    - .c
+    - .h
+    - .rs
+    - .rb
+    - .php
+
+# Custom instructions file
+# This file contains additional instructions for the AI agent
+instructions_file: ~/.rubrduck/AGENTS.md
