@@ -8,6 +8,22 @@ import (
 	"github.com/spf13/viper"
 )
 
+// SandboxPolicy represents user-configurable sandbox restrictions
+type SandboxPolicy struct {
+	AllowReadPaths  []string `mapstructure:"allow_read_paths"`
+	AllowWritePaths []string `mapstructure:"allow_write_paths"`
+	BlockPaths      []string `mapstructure:"block_paths"`
+	AllowNetwork    bool     `mapstructure:"allow_network"`
+	AllowedHosts    []string `mapstructure:"allowed_hosts"`
+	MaxProcesses    int      `mapstructure:"max_processes"`
+	MaxMemoryMB     int      `mapstructure:"max_memory_mb"`
+	MaxCPUTime      int      `mapstructure:"max_cpu_time"` // seconds
+	AllowedCommands []string `mapstructure:"allowed_commands"`
+	BlockedCommands []string `mapstructure:"blocked_commands"`
+	AllowedEnvVars  []string `mapstructure:"allowed_env_vars"`
+	BlockedEnvVars  []string `mapstructure:"blocked_env_vars"`
+}
+
 // Config represents the complete configuration for RubrDuck
 type Config struct {
 	Provider  string              `mapstructure:"provider"`
@@ -16,6 +32,7 @@ type Config struct {
 	Agent     AgentConfig         `mapstructure:"agent"`
 	API       APIConfig           `mapstructure:"api"`
 	History   HistoryConfig       `mapstructure:"history"`
+	Sandbox   SandboxPolicy       `mapstructure:"sandbox"`
 }
 
 // Provider represents an AI provider configuration
@@ -108,6 +125,27 @@ func setDefaults() {
 	viper.SetDefault("history.max_size", 1000)
 	viper.SetDefault("history.save_history", true)
 	viper.SetDefault("history.sensitive_patterns", []string{})
+
+	// Sandbox policy defaults
+	viper.SetDefault("sandbox.allow_read_paths", []string{"./"})
+	viper.SetDefault("sandbox.allow_write_paths", []string{"./"})
+	viper.SetDefault("sandbox.block_paths", []string{"/etc", "/var", "/usr", "/bin", "/sbin", "/System"})
+	viper.SetDefault("sandbox.allow_network", false)
+	viper.SetDefault("sandbox.allowed_hosts", []string{})
+	viper.SetDefault("sandbox.max_processes", 10)
+	viper.SetDefault("sandbox.max_memory_mb", 512)
+	viper.SetDefault("sandbox.max_cpu_time", 30)
+	viper.SetDefault("sandbox.allowed_commands", []string{
+		"ls", "cat", "head", "tail", "grep", "find", "wc", "sort", "uniq",
+		"echo", "pwd", "whoami", "date", "ps", "git", "go", "npm", "yarn", "python", "node", "make",
+	})
+	viper.SetDefault("sandbox.blocked_commands", []string{
+		"rm", "rmdir", "del", "format", "mkfs", "dd", "shred",
+		"sudo", "su", "chmod", "chown", "passwd", "useradd",
+		"wget", "curl", "nc", "netcat", "ssh", "scp", "rsync",
+	})
+	viper.SetDefault("sandbox.allowed_env_vars", []string{"PATH", "HOME", "USER", "PWD", "LANG", "LC_ALL"})
+	viper.SetDefault("sandbox.blocked_env_vars", []string{"SUDO_ASKPASS", "SSH_AUTH_SOCK", "GPG_AGENT_INFO"})
 }
 
 // Validate validates the configuration
