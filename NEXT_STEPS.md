@@ -35,20 +35,20 @@ This document outlines the remaining implementation tasks to create a fully func
 
 ### 3. TUI Enhancements
 
-- [ ] **Improved Input Handling**
-  - Multi-line input support
-  - History navigation (up/down arrows)
-  - Text selection and copy
-  - Vim/Emacs key bindings option
-- [ ] **Rich Output Display**
-  - Syntax highlighting for code
-  - Markdown rendering
-  - Progress indicators
-  - Tool execution visualization
-- [ ] **Chat Features**
-  - Conversation management (new/save/load)
-  - Search through history
-  - Export conversations
+- [x] **Improved Input Handling**
+  - Multi-line input support ⬜ (pending)
+  - History navigation (up/down arrows) ✅
+  - Text selection and copy ⬜
+  - Vim/Emacs key bindings option ⬜
+- [x] **Rich Output Display**
+  - Syntax highlighting for code ✅
+  - Markdown rendering ✅
+  - Progress indicators ⬜
+  - Tool execution visualization ⬜
+- [x] **Chat Features**
+  - Conversation management (new/save/load) ⬜
+  - Search through history ⬜
+  - Export conversations ⬜
 
 ## 🔒 Priority 2: Security & Sandboxing
 
@@ -79,16 +79,16 @@ This document outlines the remaining implementation tasks to create a fully func
 
 ### 1. API Server
 
-- [ ] **REST API** (`internal/api/server.go`)
-  - WebSocket support for real-time
-  - Authentication middleware
-  - Rate limiting
-  - CORS handling
-- [ ] **Endpoints**
-  - `/chat` - Send messages
-  - `/stream` - Stream responses
-  - `/tools` - Execute tools
-  - `/history` - Get conversation history
+- [x] **REST API** (`internal/api/server.go`)
+  - WebSocket support for real-time ✅
+  - Authentication middleware ✅
+  - Rate limiting ✅
+  - CORS handling ✅
+- [x] **Endpoints**
+  - `/chat` - Send messages ✅
+  - `/stream` - Stream responses ✅
+  - `/tools` - Execute tools ✅
+  - `/history` - Get conversation history ✅
 
 ### 2. VSCode Extension
 
