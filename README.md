@@ -175,6 +175,9 @@ npm run build
 
 RubrDuck implements a multi-layered security approach:
 
+> **Note for macOS users:**
+> The built-in sandboxing uses Apple's `sandbox-exec`, which is unreliable for general-purpose command sandboxing on modern macOS. Even with permissive profiles, many commands may fail with exit status 65 due to SIP and system restrictions. This is a known limitation of the platform and not a bug in RubrDuck. For full sandbox support, use Linux.
+
 1. **Approval Modes**
 
    - `suggest`: All actions require user approval

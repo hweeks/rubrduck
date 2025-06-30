@@ -15,10 +15,11 @@ import (
 
 // Agent represents the core AI agent that handles conversations and actions
 type Agent struct {
-	config   *config.Config
-	provider ai.Provider
-	tools    map[string]Tool
-	history  []ai.Message
+	config         *config.Config
+	provider       ai.Provider
+	tools          map[string]Tool
+	history        []ai.Message
+	approvalSystem *ApprovalSystem
 }
 
 // Tool represents an action the agent can perform
@@ -51,6 +52,22 @@ func New(cfg *config.Config) (*Agent, error) {
 		tools:    make(map[string]Tool),
 		history:  []ai.Message{},
 	}
+
+	// Initialize approval system
+	approvalConfig := &Config{
+		Mode:                    cfg.Agent.ApprovalMode,
+		AutoApproveLowRisk:      cfg.Agent.ApprovalMode == "auto-edit",
+		AutoApproveSafeCommands: cfg.Sandbox.AllowedCommands,
+		AutoApproveSafePaths:    cfg.Sandbox.AllowWritePaths,
+		BlockedCommands:         cfg.Sandbox.BlockedCommands,
+		BlockedPaths:            cfg.Sandbox.BlockPaths,
+		MaxBatchSize:            10,
+		Timeout:                 30 * time.Second,
+		Policies:                make(map[string]Policy),
+	}
+
+	// Create approval callback that will be set by the TUI
+	agent.approvalSystem = NewApprovalSystem(approvalConfig, nil)
 
 	// Register default tools
 	agent.registerDefaultTools()
@@ -211,10 +228,18 @@ func (a *Agent) getToolDefinitions() []ai.Tool {
 	return tools
 }
 
+// SetApprovalCallback sets the approval callback for the agent
+func (a *Agent) SetApprovalCallback(callback ApprovalCallback) {
+	if a.approvalSystem != nil {
+		a.approvalSystem.callback = callback
+	}
+}
+
 // executeToolCalls executes the requested tool calls
 func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []ai.ToolCall) []ai.Message {
 	var results []ai.Message
 
+	// First pass: collect all approval requests
 	for _, call := range toolCalls {
 		tool, ok := a.tools[call.Function.Name]
 		if !ok {
@@ -226,17 +251,27 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []ai.ToolCall) [
 			continue
 		}
 
-		// Check approval mode
-		if a.config.Agent.ApprovalMode == "suggest" {
-			// In suggest mode, we would need user approval here
-			// For now, we'll just log it
-			log.Info().
-				Str("tool", call.Function.Name).
-				Str("args", call.Function.Arguments).
-				Msg("Tool execution requires approval")
+		// Request approval for the tool execution
+		approvalResult, err := a.approvalSystem.RequestApproval(ctx, call.Function.Name, call.Function.Arguments, call)
+		if err != nil {
+			results = append(results, ai.Message{
+				Role:    "tool",
+				Content: fmt.Sprintf("Error: Approval failed for %s: %v", call.Function.Name, err),
+				Name:    call.ID,
+			})
+			continue
 		}
 
-		// Execute the tool
+		if !approvalResult.Approved {
+			results = append(results, ai.Message{
+				Role:    "tool",
+				Content: fmt.Sprintf("Operation denied: %s", approvalResult.Reason),
+				Name:    call.ID,
+			})
+			continue
+		}
+
+		// Execute the approved tool
 		result, err := tool.Execute(ctx, call.Function.Arguments)
 		if err != nil {
 			results = append(results, ai.Message{

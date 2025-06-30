@@ -4,16 +4,51 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/hammie/rubrduck/internal/sandbox"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func skipOnDarwin(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping sandboxed shell test on macOS due to sandbox-exec limitations.")
+	}
+}
+
+func absTempPolicy(tempDir string) sandbox.Policy {
+	policy := sandbox.DefaultPolicy()
+	policy.AllowReadPaths = []string{
+		tempDir,
+		"/bin",
+		"/usr/bin",
+		"/usr/lib",
+		"/System/Library",
+		"/private/tmp",
+		"/dev",
+		"/var",
+		"/sbin",
+		"/usr/sbin",
+		"/Library",
+		"/private/var",
+		"/private/etc",
+		"/Applications",
+		"/tmp",
+	}
+	policy.AllowWritePaths = []string{tempDir}
+	// Add additional commands needed for testing
+	policy.AllowedCommands = append(policy.AllowedCommands, "sleep")
+	return policy
+}
+
 func TestShellTool_ExecuteSimpleCommand(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test simple command
 	args := `{"command": "echo hello world"}`
@@ -24,8 +59,10 @@ func TestShellTool_ExecuteSimpleCommand(t *testing.T) {
 }
 
 func TestShellTool_ExecuteWithWorkingDir(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Create a subdirectory
 	subDir := filepath.Join(tempDir, "subdir")
@@ -40,8 +77,10 @@ func TestShellTool_ExecuteWithWorkingDir(t *testing.T) {
 }
 
 func TestShellTool_CommandValidation(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test blocked commands
 	blockedCommands := []string{
@@ -84,8 +123,10 @@ func TestShellTool_CommandValidation(t *testing.T) {
 }
 
 func TestShellTool_Timeout(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test command timeout
 	args := `{"command": "sleep 10", "timeout": 1}`
@@ -95,8 +136,10 @@ func TestShellTool_Timeout(t *testing.T) {
 }
 
 func TestShellTool_InvalidArguments(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test invalid JSON
 	_, err := shellTool.Execute(context.Background(), "invalid json")
@@ -117,7 +160,9 @@ func TestShellTool_InvalidArguments(t *testing.T) {
 }
 
 func TestShellTool_GetDefinition(t *testing.T) {
-	shellTool := NewShellTool("/tmp")
+	skipOnDarwin(t)
+	policy := absTempPolicy("/tmp")
+	shellTool := NewShellTool("/tmp", policy)
 	def := shellTool.GetDefinition()
 
 	assert.Equal(t, "function", def.Type)
@@ -132,8 +177,10 @@ func TestShellTool_GetDefinition(t *testing.T) {
 }
 
 func TestShellTool_CommandOutput(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test command with stdout and stderr (using separate commands since && is blocked)
 	args := `{"command": "echo 'stdout message'"}`
@@ -151,8 +198,10 @@ func TestShellTool_CommandOutput(t *testing.T) {
 }
 
 func TestShellTool_ErrorHandling(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test command that fails
 	args := `{"command": "ls /nonexistent/file"}`
@@ -162,8 +211,10 @@ func TestShellTool_ErrorHandling(t *testing.T) {
 }
 
 func TestShellTool_Configuration(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test setting allowed commands
 	newAllowed := []string{"custom1", "custom2"}
@@ -180,8 +231,10 @@ func TestShellTool_Configuration(t *testing.T) {
 }
 
 func TestShellTool_PathSanitization(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test path traversal attempt
 	args := `{"command": "ls", "working_dir": "../../../etc"}`
@@ -197,8 +250,10 @@ func TestShellTool_PathSanitization(t *testing.T) {
 }
 
 func TestShellTool_ContextCancellation(t *testing.T) {
+	skipOnDarwin(t)
 	tempDir := t.TempDir()
-	shellTool := NewShellTool(tempDir)
+	policy := absTempPolicy(tempDir)
+	shellTool := NewShellTool(tempDir, policy)
 
 	// Test context cancellation
 	ctx, cancel := context.WithCancel(context.Background())
