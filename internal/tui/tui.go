@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/hammie/rubrduck/internal/agent"
 	"github.com/hammie/rubrduck/internal/config"
 )
 
@@ -41,6 +43,7 @@ var (
 
 type model struct {
 	config   *config.Config
+	agent    *agent.Agent
 	messages []message
 	input    string
 	width    int
@@ -55,11 +58,40 @@ type message struct {
 }
 
 func initialModel(cfg *config.Config) model {
+	// Create agent instance
+	agentInstance, err := agent.New(cfg)
+	if err != nil {
+		// Handle error gracefully - we'll show it in the UI
+		return model{
+			config:   cfg,
+			messages: []message{},
+			input:    "",
+		}
+	}
+
+	// Set up approval callback
+	agentInstance.SetApprovalCallback(handleApproval)
+
 	return model{
 		config:   cfg,
+		agent:    agentInstance,
 		messages: []message{},
 		input:    "",
 	}
+}
+
+// handleApproval handles approval requests from the agent
+func handleApproval(req agent.ApprovalRequest) (agent.ApprovalResult, error) {
+	// Show approval dialog
+	result, err := ShowApprovalDialog(req)
+	if err != nil {
+		return agent.ApprovalResult{Approved: false, Reason: fmt.Sprintf("Dialog error: %v", err)}, err
+	}
+
+	return agent.ApprovalResult{
+		Approved: result.Approved,
+		Reason:   result.Reason,
+	}, nil
 }
 
 func (m model) Init() tea.Cmd {
@@ -81,12 +113,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					content: m.input,
 				})
 
-				// TODO: Send to AI and get response
-				// For now, just echo back
-				m.messages = append(m.messages, message{
-					role:    "assistant",
-					content: fmt.Sprintf("I received: %s\n\n(AI integration coming soon!)", m.input),
-				})
+				// Send to AI agent
+				if m.agent != nil {
+					ctx := context.Background()
+					response, err := m.agent.Chat(ctx, m.input)
+					if err != nil {
+						m.messages = append(m.messages, message{
+							role:    "assistant",
+							content: fmt.Sprintf("Error: %v", err),
+						})
+					} else {
+						m.messages = append(m.messages, message{
+							role:    "assistant",
+							content: response,
+						})
+					}
+				} else {
+					m.messages = append(m.messages, message{
+						role:    "assistant",
+						content: "Agent not available. Please check configuration.",
+					})
+				}
 
 				m.input = ""
 			}

@@ -34,7 +34,7 @@ func NewShellTool(basePath string, policy sandbox.Policy) *ShellTool {
 		basePath:       basePath,
 		allowedCmds:    policy.AllowedCommands,
 		blockedCmds:    policy.BlockedCommands,
-		timeout:        time.Duration(policy.MaxCPUTime) * time.Second,
+		timeout:        policy.MaxCPUTime,
 		sandbox:        sandboxInstance,
 		sandboxEnabled: sandboxEnabled,
 		basePolicy:     policy,

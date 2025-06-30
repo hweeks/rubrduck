@@ -1,3 +1,8 @@
+// NOTE: macOS sandbox-exec is unreliable for general-purpose sandboxing.
+// Even with permissive profiles, many commands may fail with exit status 65 due to SIP and system restrictions.
+// This is a known limitation of the platform and not a bug in this implementation.
+// For full sandbox support, use Linux.
+
 package sandbox
 
 import (

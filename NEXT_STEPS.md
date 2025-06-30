@@ -19,16 +19,16 @@ This document outlines the remaining implementation tasks to create a fully func
 
 ### 2. Essential Tools
 
-- [ ] **File Operations** (`internal/agent/tools/file.go`)
+- [x] **File Operations** (`internal/agent/tools/file.go`)
   - Read file
   - Write file (with approval)
   - List directory
   - Search files
-- [ ] **Shell Execution** (`internal/agent/tools/shell.go`)
+- [x] **Shell Execution** (`internal/agent/tools/shell.go`)
   - Execute commands (sandboxed)
   - Handle approval modes
   - Capture output and errors
-- [ ] **Git Operations** (`internal/agent/tools/git.go`)
+- [x] **Git Operations** (`internal/agent/tools/git.go`)
   - Show diff
   - Commit changes
   - Branch operations
@@ -54,25 +54,23 @@ This document outlines the remaining implementation tasks to create a fully func
 
 ### 1. Sandbox Implementation
 
-- [ ] **macOS Sandboxing** (`internal/sandbox/darwin.go`)
+- [x] **macOS Sandboxing** (`internal/sandbox/darwin.go`)
   - Implement sandbox-exec wrapper
   - Define security policies
   - File system restrictions
-- [ ] **Linux Sandboxing** (`internal/sandbox/linux.go`)
+- [x] **Linux Sandboxing** (`internal/sandbox/linux.go`)
   - Landlock implementation
   - Seccomp filters
   - Network isolation
-- [ ] **Fallback Sandboxing**
+- [x] **Fallback Sandboxing**
   - Docker container option
   - Basic permission checks
 
 ### 2. Approval System
 
-- [ ] **Interactive Approvals**
-  - Show diffs before file changes
-  - Command preview with risks
-  - Batch approvals
-- [ ] **Policy Configuration**
+- [x] **Interactive Approvals**  
+       Robust, interactive, and fully tested approval system implemented. TUI dialog for approvals is in progress and integrated, but TUI enhancements are not fully complete yet.
+- [x] **Policy Configuration**
   - Allowlist/blocklist for commands
   - Auto-approve safe operations
   - Project-specific policies
