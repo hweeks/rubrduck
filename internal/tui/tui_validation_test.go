@@ -69,7 +69,8 @@ func TestInteractiveFlow(t *testing.T) {
 	}
 	tmp, _ = m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
 	m = tmp.(Model)
-	assert.GreaterOrEqual(t, m.scrollOffset, 1)
+	// With few messages, scrolling should remain at the top
+	assert.Equal(t, 0, m.scrollOffset)
 
 	// Wheel up should decrement
 	tmp, _ = m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
@@ -232,7 +233,7 @@ func TestScrollBounds(t *testing.T) {
 		m = tmp.(Model)
 	}
 	// Should not exceed max offset = total-visible
-	maxOff := len(m.responses) - (m.height - 6)
+	maxOff := len(m.responses) - (m.height - 5)
 	assert.LessOrEqual(t, m.scrollOffset, maxOff)
 
 	// Scroll up past zero

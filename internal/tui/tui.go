@@ -267,9 +267,20 @@ func (m *Model) SetFocused(f bool) {
 	}
 }
 
+// contentHeight returns the number of lines available for conversation content
+// beneath the header and status bars.
+func (m Model) contentHeight() int {
+	// Header, input, and status bar together consume 5 lines
+	h := m.height - 5
+	if h < 1 {
+		return 1
+	}
+	return h
+}
+
 // clampScroll ensures scrollOffset is not negative or beyond the available responses.
 func (m *Model) clampScroll() {
-	max := len(m.responses) - 1
+	max := len(m.responses) - m.contentHeight()
 	if max < 0 {
 		max = 0
 	}
@@ -283,10 +294,7 @@ func (m *Model) clampScroll() {
 // adjustScrollToBottom positions the view so that the last response is visible
 func (m *Model) adjustScrollToBottom() {
 	// Scroll so that the newest responses fill the content window
-	visible := m.height - 12
-	if visible < 1 {
-		visible = 1
-	}
+	visible := m.contentHeight()
 	m.scrollOffset = len(m.responses) - visible
 	if m.scrollOffset < 0 {
 		m.scrollOffset = 0
@@ -299,29 +307,34 @@ func (m Model) renderConversation(maxHeight int) string {
 		return "No conversation yet. Type a message below to get started!"
 	}
 
-	var parts []string
-	parts = append(parts, "")
+	var lines []string
 
 	visibles := m.responses[m.scrollOffset:]
 	for i, resp := range visibles {
-		if len(parts) > maxHeight-5 {
+		if len(lines) >= maxHeight {
 			break
 		}
 		if resp.Answer == "" {
 			userStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#00D7FF")).Bold(true)
-			parts = append(parts, userStyle.Render("👤 You: ")+resp.Query)
+			lines = append(lines, userStyle.Render("👤 You: ")+resp.Query)
 		} else {
 			asstStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED")).Bold(true)
-			parts = append(parts, asstStyle.Render("🤖 Assistant: "))
+			lines = append(lines, asstStyle.Render("🤖 Assistant: "))
 
 			wrapped := m.wrapText(resp.Answer, m.width-6)
-			parts = append(parts, wrapped)
+			lines = append(lines, wrapped)
 		}
 		if i < len(visibles)-1 {
-			parts = append(parts, "")
+			lines = append(lines, "")
 		}
 	}
-	return strings.Join(parts, "\n")
+
+	// Pad the output so conversation sticks to the bottom when not enough messages
+	if len(lines) < maxHeight {
+		padding := strings.Repeat("\n", maxHeight-len(lines))
+		return padding + strings.Join(lines, "\n")
+	}
+	return strings.Join(lines, "\n")
 }
 
 // wrapText wraps text to fit within the specified width
