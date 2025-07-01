@@ -97,11 +97,11 @@ This document outlines the remaining implementation tasks to create a fully func
   - Inline code suggestions ✅
   - Selection-based actions ✅
   - Chat sidebar ✅
-- [ ] **Advanced Features**
-  - Code lens integration
-  - Diff view for changes
-  - Multi-file operations
-  - Custom commands
+- [x] **Advanced Features** ✅
+  - Code lens integration ✅
+  - Diff view for changes ✅
+  - Multi-file operations ✅
+  - Custom commands ✅
 
 ### 3. Wire Protocol
 

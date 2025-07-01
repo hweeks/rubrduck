@@ -11,6 +11,11 @@ import {
   handleGenerateCode,
   handleGenerateTests,
 } from "./commands/codeActions";
+import {
+  handleFixFile,
+  handleCustomCommand,
+} from "./commands/codeActions";
+import { RubrDuckCodeLensProvider } from "./codelensProvider";
 
 let api: RubrDuckAPI;
 let chatProvider: ChatProvider;
@@ -40,6 +45,16 @@ export function activate(context: vscode.ExtensionContext) {
     historyProvider
   );
 
+  // Register CodeLens provider if enabled
+  const enableCodeLens = config.get<boolean>("enableCodeLens", true);
+  let codeLensDisposable: vscode.Disposable | undefined;
+  if (enableCodeLens) {
+    codeLensDisposable = vscode.languages.registerCodeLensProvider(
+      { scheme: "file" },
+      new RubrDuckCodeLensProvider()
+    );
+  }
+
   // Register commands
   const openChatCommand = vscode.commands.registerCommand(
     "rubrduck.chat",
@@ -50,14 +65,41 @@ export function activate(context: vscode.ExtensionContext) {
 
   const explainCommand = vscode.commands.registerCommand(
     "rubrduck.explain",
-    () => {
-      handleExplainCode(api);
+    (range?: vscode.Range) => {
+      handleExplainCode(api, range);
     }
   );
 
   const fixCommand = vscode.commands.registerCommand("rubrduck.fix", () => {
     handleFixCode(api);
   });
+
+  const fixFileCommand = vscode.commands.registerCommand(
+    "rubrduck.fixFile",
+    (uri?: vscode.Uri | vscode.Uri[]) => {
+      handleFixFile(api, uri);
+    }
+  );
+
+  const customCommand = vscode.commands.registerCommand(
+    "rubrduck.custom",
+    async () => {
+      const cfg = vscode.workspace.getConfiguration("rubrduck");
+      const commands = cfg.get<any[]>("customCommands", []);
+      if (commands.length === 0) {
+        vscode.window.showInformationMessage("No custom commands configured");
+        return;
+      }
+      const pick = await vscode.window.showQuickPick(
+        commands.map((c) => c.name),
+        { placeHolder: "Select a custom command" }
+      );
+      const item = commands.find((c) => c.name === pick);
+      if (item) {
+        handleCustomCommand(api, item.prompt);
+      }
+    }
+  );
 
   const generateCommand = vscode.commands.registerCommand(
     "rubrduck.generate",
@@ -69,6 +111,7 @@ export function activate(context: vscode.ExtensionContext) {
   const testCommand = vscode.commands.registerCommand("rubrduck.test", () => {
     handleGenerateTests(api);
   });
+
 
   // Register history commands
   registerHistoryCommands(context, api, historyProvider);
@@ -90,6 +133,18 @@ export function activate(context: vscode.ExtensionContext) {
         );
         const newAuthToken = newConfig.get<string>("authToken", "");
 
+        const enableLens = newConfig.get<boolean>("enableCodeLens", true);
+        if (enableLens && !codeLensDisposable) {
+          codeLensDisposable = vscode.languages.registerCodeLensProvider(
+            { scheme: "file" },
+            new RubrDuckCodeLensProvider()
+          );
+          context.subscriptions.push(codeLensDisposable);
+        } else if (!enableLens && codeLensDisposable) {
+          codeLensDisposable.dispose();
+          codeLensDisposable = undefined;
+        }
+
         api.updateConfig(newServerUrl, newAuthToken);
       }
     }
@@ -102,9 +157,12 @@ export function activate(context: vscode.ExtensionContext) {
     openChatCommand,
     explainCommand,
     fixCommand,
+    fixFileCommand,
+    customCommand,
     generateCommand,
     testCommand,
-    configChangeListener
+    configChangeListener,
+    ...(codeLensDisposable ? [codeLensDisposable] : [])
   );
 
   console.log("RubrDuck extension activated successfully");

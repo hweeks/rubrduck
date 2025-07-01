@@ -15,14 +15,17 @@ RubrDuck is an AI-powered coding assistant that brings intelligent code analysis
 
 - **Explain Code**: Get detailed explanations of selected code
 - **Fix Code**: Automatically identify and fix issues in your code
+- **Fix File**: Run RubrDuck fixes on entire files or multiple selections
 - **Generate Code**: Create new code based on natural language descriptions
 - **Generate Tests**: Automatically create unit tests for your functions
+- **Custom Commands**: Define your own prompts for common tasks
 
 ### 🎯 Context-Aware Assistance
 
 - Automatically includes selected code as context
 - Understands your current file and programming language
 - Provides relevant suggestions and fixes
+- Inline CodeLens actions for quick access
 
 ## Getting Started
 
@@ -37,6 +40,8 @@ Open VSCode settings and search for "RubrDuck" to configure:
 - `rubrduck.serverUrl`: The URL of your RubrDuck server (default: `http://localhost:8080`)
 - `rubrduck.authToken`: Authentication token for the RubrDuck API (if required)
 - `rubrduck.autoStart`: Automatically connect to server on startup (default: `true`)
+- `rubrduck.enableCodeLens`: Show inline CodeLens actions (default: `true`)
+- `rubrduck.customCommands`: Array of custom commands with `name` and `prompt`
 
 ## Usage
 
