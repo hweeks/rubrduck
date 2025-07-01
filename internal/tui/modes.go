@@ -12,8 +12,8 @@ const (
 	ViewModeBuilding
 	// ViewModeDebugging is the debugging screen
 	ViewModeDebugging
-	// ViewModeTechDebt is the tech debt screen
-	ViewModeTechDebt
+	// ViewModeEnhance is the enhance screen
+	ViewModeEnhance
 )
 
 // ModeOptions enumerates the available modes in selection order
@@ -21,7 +21,7 @@ var ModeOptions = []ViewMode{
 	ViewModePlanning,
 	ViewModeBuilding,
 	ViewModeDebugging,
-	ViewModeTechDebt,
+	ViewModeEnhance,
 }
 
 // ModeName returns a human-friendly name for a ViewMode
@@ -33,8 +33,8 @@ func ModeName(mode ViewMode) string {
 		return "Building"
 	case ViewModeDebugging:
 		return "Debugging"
-	case ViewModeTechDebt:
-		return "Tech Debt"
+	case ViewModeEnhance:
+		return "Enhance"
 	default:
 		return ""
 	}

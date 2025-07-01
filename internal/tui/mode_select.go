@@ -23,7 +23,7 @@ func (m Model) renderModeSelect() string {
 		{"Planning", ViewModePlanning, "Architecture design and project planning", "📋"},
 		{"Building", ViewModeBuilding, "Code implementation and development", "🔨"},
 		{"Debugging", ViewModeDebugging, "Error analysis and problem solving", "🐛"},
-		{"Tech Debt", ViewModeTechDebt, "Code quality improvement and refactoring", "🔧"},
+		{"Enhance", ViewModeEnhance, "Code quality improvement and refactoring", "🔧"},
 	}
 
 	for i, modeInfo := range modes {

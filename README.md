@@ -138,6 +138,15 @@ api:
 rubrduck
 ```
 
+### TUI Modes
+
+RubrDuck offers four workflow modes accessible from the terminal UI:
+
+1. **Planning** – discuss architecture and high level design
+2. **Building** – implement features and generate code
+3. **Debugging** – investigate and fix issues
+4. **Enhance** – refactor and pay down technical debt
+
 ### Command Mode
 
 ```bash
