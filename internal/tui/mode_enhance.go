@@ -10,8 +10,6 @@ import (
 // renderEnhance renders the enhance mode view
 func (m Model) renderEnhance() string {
 	var b strings.Builder
-	b.WriteString(m.renderTitle())
-	b.WriteString("\n\n")
 
 	if len(m.responses) > 0 {
 		b.WriteString("Enhance Mode - Code Quality & Refactoring\n")

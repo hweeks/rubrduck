@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,6 +19,8 @@ type Response struct {
 	Time   string
 }
 
+type responseFinishedMsg struct{ resp Response }
+
 // Model is the root TUI model managing modes, input, and global state
 type Model struct {
 	config         *config.Config
@@ -27,6 +30,9 @@ type Model struct {
 
 	input   textinput.Model
 	focused bool
+
+	streaming   bool
+	progressMsg string
 
 	quitting     bool
 	responses    []Response
@@ -82,6 +88,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.Width = win.Width - 10
 	}
 
+	// Finalize streaming responses
+	if fin, ok := msg.(responseFinishedMsg); ok {
+		m.responses = append(m.responses, fin.resp)
+		m.streaming = false
+		m.progressMsg = ""
+		m.focused = true
+		cmds = append(cmds, m.input.Focus())
+		m.adjustScrollToBottom()
+	}
+
 	// Global quit
 	if key, ok := msg.(tea.KeyMsg); ok && key.Type == tea.KeyCtrlC {
 		m.quitting = true
@@ -130,9 +146,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				q := strings.TrimSpace(m.input.Value())
 				if q != "" {
 					m.responses = append(m.responses, Response{Mode: m.viewMode, Query: q, Time: "Just now"})
-					m.responses = append(m.responses, m.generateSimulatedResponse(q))
+					m.streaming = true
+					m.progressMsg = "Thinking..."
 					m.input.Reset()
-					cmds = append(cmds, m.input.Focus())
+					m.focused = false
+					m.input.Blur()
+					cmds = append(cmds, tea.Tick(time.Millisecond*10, func(t time.Time) tea.Msg {
+						return responseFinishedMsg{resp: m.generateSimulatedResponse(q)}
+					}))
 					m.adjustScrollToBottom()
 				}
 			}
@@ -162,8 +183,8 @@ func (m Model) View() string {
 		return "Thanks for using RubrDuck! 🦆\n"
 	}
 
-	// Reserve lines for input (5) + status bar (1)
-	contentHeight := m.height - 6
+	// Reserve lines for header (1) + input (3) + status bar (1)
+	contentHeight := m.height - 5
 	if contentHeight < 3 {
 		contentHeight = 3
 	}
@@ -186,15 +207,20 @@ func (m Model) View() string {
 		}
 	}
 
+	headerView := lipgloss.NewStyle().Bold(true).Foreground(primaryColor).Width(m.width).Render(m.renderTitle())
 	content := lipgloss.NewStyle().Height(contentHeight).Width(m.width - 2).Padding(1).Render(body)
 
 	var inputView string
 	if m.viewMode != ViewModeSelect {
-		inputView = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(primaryColor).Padding(1).Width(m.width - 4).Render(m.input.View())
+		if m.streaming {
+			inputView = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(primaryColor).Padding(1).Width(m.width - 4).Render(m.progressMsg)
+		} else {
+			inputView = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(primaryColor).Padding(1).Width(m.width - 4).Render(m.input.View())
+		}
 	}
 
 	statusView := renderStatusBar(m)
-	return lipgloss.JoinVertical(lipgloss.Left, content, inputView, statusView)
+	return lipgloss.JoinVertical(lipgloss.Left, headerView, content, inputView, statusView)
 }
 
 // Run launches the TUI application
@@ -270,11 +296,11 @@ func (m *Model) adjustScrollToBottom() {
 // renderConversation shows the chat history with proper scrolling
 func (m Model) renderConversation(maxHeight int) string {
 	if len(m.responses) == 0 {
-		return m.renderTitle() + "\n\nNo conversation yet. Type a message below to get started!"
+		return "No conversation yet. Type a message below to get started!"
 	}
 
 	var parts []string
-	parts = append(parts, m.renderTitle(), "")
+	parts = append(parts, "")
 
 	visibles := m.responses[m.scrollOffset:]
 	for i, resp := range visibles {

@@ -34,8 +34,12 @@ func TestInteractiveFlow(t *testing.T) {
 		tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 		m = tmp.(Model)
 	}
-	tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	tmp, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = tmp.(Model)
+	if cmd != nil {
+		tmp, _ = m.Update(cmd())
+		m = tmp.(Model)
+	}
 	assert.Len(t, m.responses, 2)
 	assert.Empty(t, m.input.Value())
 
@@ -44,8 +48,12 @@ func TestInteractiveFlow(t *testing.T) {
 		tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 		m = tmp.(Model)
 	}
-	tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	tmp, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = tmp.(Model)
+	if cmd != nil {
+		tmp, _ = m.Update(cmd())
+		m = tmp.(Model)
+	}
 	assert.Len(t, m.responses, 4)
 
 	// Scroll up (when input not focused)
@@ -109,8 +117,12 @@ func TestAutoScrollOnOverflow(t *testing.T) {
 		tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 		m = tmp.(Model)
 		// submit
-		tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		tmp, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		m = tmp.(Model)
+		if cmd != nil {
+			tmp, _ = m.Update(cmd())
+			m = tmp.(Model)
+		}
 	}
 
 	// After overflow, scrollOffset should be greater than zero
@@ -145,8 +157,12 @@ func TestComprehensiveUIBehavior(t *testing.T) {
 			tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 			m = tmp.(Model)
 		}
-		tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		tmp, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		m = tmp.(Model)
+		if cmd != nil {
+			tmp, _ = m.Update(cmd())
+			m = tmp.(Model)
+		}
 		assert.Len(t, m.responses, (i+1)*2)
 		assert.Empty(t, m.input.Value())
 	}

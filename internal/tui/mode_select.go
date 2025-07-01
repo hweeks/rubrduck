@@ -10,8 +10,7 @@ import (
 // renderModeSelect renders the mode selection interface
 func (m Model) renderModeSelect() string {
 	var b strings.Builder
-	b.WriteString(m.renderTitle())
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 	b.WriteString("Choose your RubrDuck mode:\n\n")
 
 	modes := []struct {
