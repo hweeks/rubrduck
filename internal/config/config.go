@@ -33,6 +33,15 @@ type Config struct {
 	API       APIConfig           `mapstructure:"api"`
 	History   HistoryConfig       `mapstructure:"history"`
 	Sandbox   SandboxPolicy       `mapstructure:"sandbox"`
+	// TUI holds configuration for the terminal user interface
+	TUI TUIConfig `mapstructure:"tui"`
+}
+
+// TUIConfig holds settings for the terminal UI modes
+type TUIConfig struct {
+	// StartMode sets the initial UI mode ("planning", "building", "debugging", "tech-debt").
+	// If empty or unrecognized, the UI will prompt to select a mode.
+	StartMode string `mapstructure:"start_mode"`
 }
 
 // Provider represents an AI provider configuration
@@ -146,6 +155,9 @@ func setDefaults() {
 	})
 	viper.SetDefault("sandbox.allowed_env_vars", []string{"PATH", "HOME", "USER", "PWD", "LANG", "LC_ALL"})
 	viper.SetDefault("sandbox.blocked_env_vars", []string{"SUDO_ASKPASS", "SSH_AUTH_SOCK", "GPG_AGENT_INFO"})
+
+	// TUI defaults
+	viper.SetDefault("tui.start_mode", "")
 }
 
 // Validate validates the configuration
