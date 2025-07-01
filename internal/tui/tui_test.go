@@ -35,7 +35,7 @@ func TestModeSelectView(t *testing.T) {
 	assert.Contains(t, view, "Planning")
 	assert.Contains(t, view, "Building")
 	assert.Contains(t, view, "Debugging")
-	assert.Contains(t, view, "Tech Debt")
+	assert.Contains(t, view, "Enhance")
 	// first option should be selected by default
 	assert.Contains(t, view, "> Planning")
 }
@@ -58,7 +58,7 @@ func TestModeSelectEnter(t *testing.T) {
 	cfg := &config.Config{}
 	m := NewModel(cfg)
 	m.width = 60
-	// Move to Tech Debt
+	// Move to Enhance
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	v := m2.(Model)
 	m2, _ = v.Update(tea.KeyMsg{Type: tea.KeyDown})
@@ -67,7 +67,7 @@ func TestModeSelectEnter(t *testing.T) {
 	v = m2.(Model)
 	m2, _ = v.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	v = m2.(Model)
-	assert.Equal(t, ViewModeTechDebt, v.viewMode)
+	assert.Equal(t, ViewModeEnhance, v.viewMode)
 }
 
 func TestRenderPlanningView(t *testing.T) {
@@ -91,8 +91,8 @@ func TestRenderOtherModes(t *testing.T) {
 	assert.Contains(t, m.View(), "Building")
 	m.viewMode = ViewModeDebugging
 	assert.Contains(t, m.View(), "Debugging")
-	m.viewMode = ViewModeTechDebt
-	assert.Contains(t, m.View(), "Tech Debt")
+	m.viewMode = ViewModeEnhance
+	assert.Contains(t, m.View(), "Enhance")
 }
 
 func TestQuitFromModes(t *testing.T) {

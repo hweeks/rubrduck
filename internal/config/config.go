@@ -39,7 +39,7 @@ type Config struct {
 
 // TUIConfig holds settings for the terminal UI modes
 type TUIConfig struct {
-	// StartMode sets the initial UI mode ("planning", "building", "debugging", "tech-debt").
+	// StartMode sets the initial UI mode ("planning", "building", "debugging", "enhance").
 	// If empty or unrecognized, the UI will prompt to select a mode.
 	StartMode string `mapstructure:"start_mode"`
 }
