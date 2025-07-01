@@ -146,9 +146,43 @@ func (p *OpenAIProvider) StreamChat(ctx context.Context, req *ai.ChatRequest) (a
 
 // convertRequest converts our request format to OpenAI format
 func (p *OpenAIProvider) convertRequest(req *ai.ChatRequest) map[string]interface{} {
+	// Convert messages to support text and image parts
+	messages := make([]map[string]interface{}, len(req.Messages))
+	for i, msg := range req.Messages {
+		m := map[string]interface{}{
+			"role": msg.Role,
+		}
+		if len(msg.Parts) > 0 {
+			parts := make([]map[string]interface{}, len(msg.Parts))
+			for j, part := range msg.Parts {
+				if part.Type == "image_url" {
+					parts[j] = map[string]interface{}{
+						"type":      "image_url",
+						"image_url": map[string]interface{}{"url": part.ImageURL},
+					}
+				} else {
+					parts[j] = map[string]interface{}{
+						"type": "text",
+						"text": part.Text,
+					}
+				}
+			}
+			m["content"] = parts
+		} else {
+			m["content"] = msg.Content
+		}
+		if msg.Name != "" {
+			m["name"] = msg.Name
+		}
+		if len(msg.ToolCalls) > 0 {
+			m["tool_calls"] = msg.ToolCalls
+		}
+		messages[i] = m
+	}
+
 	openAIReq := map[string]interface{}{
 		"model":    req.Model,
-		"messages": req.Messages,
+		"messages": messages,
 		"stream":   req.Stream,
 	}
 

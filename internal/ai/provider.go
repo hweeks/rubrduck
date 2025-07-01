@@ -28,11 +28,21 @@ type ChatRequest struct {
 }
 
 // Message represents a chat message
+// MessagePart represents either text or image content within a message.
+type MessagePart struct {
+	Type     string `json:"type"`                // "text" or "image_url"
+	Text     string `json:"text,omitempty"`      // text content
+	ImageURL string `json:"image_url,omitempty"` // URL or data URI for images
+}
+
+// Message represents a chat message. Content is kept for backwards
+// compatibility, while Parts enables multi-modal messages.
 type Message struct {
-	Role      string     `json:"role"`
-	Content   string     `json:"content"`
-	Name      string     `json:"name,omitempty"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	Role      string        `json:"role"`
+	Content   string        `json:"content,omitempty"`
+	Parts     []MessagePart `json:"parts,omitempty"`
+	Name      string        `json:"name,omitempty"`
+	ToolCalls []ToolCall    `json:"tool_calls,omitempty"`
 }
 
 // Tool represents a function that can be called by the AI
