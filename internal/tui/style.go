@@ -60,13 +60,26 @@ var (
 )
 
 // renderHelpBar renders key hints at the bottom of the UI
-func renderHelpBar() string {
-	parts := []string{
-		KeyStyle.Render("↑/↓"), "Navigate/Scroll",
-		KeyStyle.Render("Tab"), "Focus Input",
-		KeyStyle.Render("Enter"), "Select/Submit",
-		KeyStyle.Render("Esc"), "Back",
-		KeyStyle.Render("Ctrl+C"), "Quit",
+// renderStatusBar renders the bottom status bar: help hints on left and mode info on right
+func renderStatusBar(m Model) string {
+	// Help hints (flat text)
+	hints := []string{
+		"↑/↓ Navigate/Scroll",
+		"Tab Focus Input",
+		"Enter Submit",
+		"Esc Back",
+		"Ctrl+C Quit",
 	}
-	return HelpStyle.Render(strings.Join(parts, "   "))
+	help := strings.Join(hints, "   ")
+	// Current mode on right
+	info := ModeName(m.viewMode)
+
+	// Pad between help and mode info
+	totalWidth := m.width - 4
+	pad := totalWidth - lipgloss.Width(help) - lipgloss.Width(info)
+	if pad < 1 {
+		pad = 1
+	}
+	line := help + strings.Repeat(" ", pad) + info
+	return HelpStyle.Render(line)
 }

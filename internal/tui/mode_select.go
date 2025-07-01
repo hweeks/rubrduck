@@ -14,7 +14,6 @@ func (m Model) renderModeSelect() string {
 	b.WriteString("\n\n")
 	b.WriteString("Choose your RubrDuck mode:\n\n")
 
-	// List available modes with descriptions
 	modes := []struct {
 		name        string
 		mode        ViewMode
@@ -30,24 +29,20 @@ func (m Model) renderModeSelect() string {
 	for i, modeInfo := range modes {
 		prefix := "  "
 		if i == m.selectedOption {
-			prefix = "▶ "
+			prefix = "> "
 		}
 
-		style := lipgloss.NewStyle().
-			Foreground(textPrimary)
+		style := lipgloss.NewStyle().Foreground(textPrimary)
 
 		if i == m.selectedOption {
-			style = style.
-				Bold(true).
-				Foreground(primaryColor)
+			style = style.Bold(true).Foreground(primaryColor)
 		}
 
-		line := style.Render(prefix + modeInfo.icon + " " + modeInfo.name + " - " + modeInfo.description)
+		line := style.Render(prefix + modeInfo.name + " - " + modeInfo.description)
 		b.WriteString(line + "\n")
 	}
 
 	b.WriteString("\nUse ↑/↓ to navigate, Enter to select a mode")
-
 	return b.String()
 }
 
@@ -61,21 +56,11 @@ func (m Model) updateModeSelect(msg tea.Msg) (Model, tea.Cmd) {
 				m.selectedOption--
 			}
 		case tea.KeyDown:
-			if m.selectedOption < 3 { // 4 total modes (0-3)
+			if m.selectedOption < len(ModeOptions)-1 {
 				m.selectedOption++
 			}
 		case tea.KeyEnter:
-			// Switch to selected mode
-			switch m.selectedOption {
-			case 0:
-				m.viewMode = ViewModePlanning
-			case 1:
-				m.viewMode = ViewModeBuilding
-			case 2:
-				m.viewMode = ViewModeDebugging
-			case 3:
-				m.viewMode = ViewModeTechDebt
-			}
+			m.viewMode = ModeOptions[m.selectedOption]
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width

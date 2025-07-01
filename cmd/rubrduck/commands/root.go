@@ -19,6 +19,26 @@ var (
 	approvalMode string
 )
 
+// tuiSnapshotsCmd generates static text snapshots for each TUI mode
+var tuiSnapshotsCmd = &cobra.Command{
+	Use:   "tui-snapshots",
+	Short: "Generate static snapshots of all TUI modes",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+		for _, mode := range tui.ModeOptions {
+			m := tui.NewModel(cfg)
+			m.SetMode(mode)
+			m.SetSize(80, 24)
+			m.SetFocused(true)
+			fmt.Printf("=== %s ===\n%s\n\n", tui.ModeName(mode), m.View())
+		}
+		return nil
+	},
+}
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "rubrduck",
@@ -62,6 +82,9 @@ func init() {
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
+
+	// Generate static snapshots of the TUI modes
+	rootCmd.AddCommand(tuiSnapshotsCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.

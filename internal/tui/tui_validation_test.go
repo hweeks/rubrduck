@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -66,6 +67,54 @@ func TestInteractiveFlow(t *testing.T) {
 	tmp, _ = m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
 	m = tmp.(Model)
 	assert.GreaterOrEqual(t, m.scrollOffset, 0)
+}
+
+// TestMouseClickRefocus verifies that clicking anywhere focuses the input
+func TestMouseClickRefocus(t *testing.T) {
+	cfg := &config.Config{}
+	m := NewModel(cfg)
+	m.viewMode = ViewModePlanning
+	m.width = 80
+	m.height = 24
+
+	// Start unfocused
+	m.focused = false
+	assert.False(t, m.focused)
+	assert.False(t, m.input.Focused())
+
+	// Simulate a left-click
+	tmp, _ := m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft})
+	v := tmp.(Model)
+	assert.True(t, v.focused)
+	assert.True(t, v.input.Focused())
+}
+
+// TestAutoScrollOnOverflow ensures that when enough messages accumulate,
+// the view auto-scrolls so the latest responses are visible.
+func TestAutoScrollOnOverflow(t *testing.T) {
+	cfg := &config.Config{}
+	m := NewModel(cfg)
+	// Use a small height so overflow occurs quickly
+	m.width = 80
+	m.height = 10
+
+	// Enter Planning mode and focus input
+	tmp, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = tmp.(Model)
+	assert.True(t, m.focused)
+
+	// Send many messages to overflow the visible area
+	for i := 0; i < 20; i++ {
+		// type a single character
+		tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+		m = tmp.(Model)
+		// submit
+		tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		m = tmp.(Model)
+	}
+
+	// After overflow, scrollOffset should be greater than zero
+	assert.Greater(t, m.scrollOffset, 0)
 }
 
 // Comprehensive end-to-end checks that mirror all user-requested behaviours.
@@ -141,4 +190,39 @@ func TestComprehensiveUIBehavior(t *testing.T) {
 	tmp, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	m = tmp.(Model)
 	assert.True(t, m.quitting)
+}
+
+// TestScrollBounds ensures scrolling is clamped within visible window
+func TestScrollBounds(t *testing.T) {
+	cfg := &config.Config{}
+	m := NewModel(cfg)
+	m.viewMode = ViewModePlanning
+
+	// Simulate a small terminal so visible area is limited
+	m.width = 80
+	m.height = 10
+
+	// Populate responses exceeding visible capacity
+	for i := 0; i < 10; i++ {
+		m.responses = append(m.responses, Response{Mode: ViewModePlanning, Query: fmt.Sprintf("q%d", i), Answer: fmt.Sprintf("a%d", i), Time: "t"})
+	}
+
+	// Not focused: arrow keys should scroll
+	m.focused = false
+
+	// Scroll down past start
+	for i := 0; i < 5; i++ {
+		tmp, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = tmp.(Model)
+	}
+	// Should not exceed max offset = total-visible
+	maxOff := len(m.responses) - (m.height - 6)
+	assert.LessOrEqual(t, m.scrollOffset, maxOff)
+
+	// Scroll up past zero
+	for i := 0; i < 10; i++ {
+		tmp, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+		m = tmp.(Model)
+	}
+	assert.GreaterOrEqual(t, m.scrollOffset, 0)
 }
