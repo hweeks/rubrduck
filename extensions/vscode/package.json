@@ -4,6 +4,11 @@
   "description": "AI-powered coding assistant for VSCode",
   "version": "0.1.0",
   "publisher": "rubrduck",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/rubrduck"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -17,7 +22,7 @@
     "code generation",
     "rubrduck"
   ],
-  "icon": "media/icon.png",
+
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -113,6 +118,7 @@
   "devDependencies": {
     "@types/node": "^20.x",
     "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^6.x",
     "@typescript-eslint/parser": "^6.x",
     "@vscode/test-electron": "^2.3.x",
@@ -123,4 +129,4 @@
     "axios": "^1.6.x",
     "ws": "^8.16.x"
   }
-} 
+}

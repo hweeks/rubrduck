@@ -332,7 +332,7 @@ func (a *ApprovalSystem) assessShellCommandRisk(command string) RiskLevel {
 	// Check for dangerous patterns
 	dangerousPatterns := []string{
 		"&&", "||", ";", "|", ">", "<", ">>", "<<", "2>", "&>",
-		"$((", "`", "source", ".",
+		"$((", "`", "source",
 	}
 
 	for _, pattern := range dangerousPatterns {

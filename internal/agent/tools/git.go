@@ -243,7 +243,18 @@ func (g *GitTool) gitBranch(ctx context.Context, args string) (string, error) {
 			return "", fmt.Errorf("git branch failed: %w", err)
 		}
 
-		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		trimmed := strings.TrimSpace(string(output))
+		// If no branches are listed (e.g., fresh repo with no commits), get the current branch name manually
+		if trimmed == "" {
+			nameCmd := exec.CommandContext(ctx, "git", "symbolic-ref", "--short", "HEAD")
+			nameCmd.Dir = g.basePath
+			nameOut, nameErr := nameCmd.Output()
+			if nameErr == nil {
+				trimmed = "* " + strings.TrimSpace(string(nameOut))
+			}
+		}
+
+		lines := strings.Split(trimmed, "\n")
 		var result strings.Builder
 		result.WriteString("Branches:\n\n")
 
@@ -306,7 +317,14 @@ func (g *GitTool) switchBranch(ctx context.Context, branchName string) (string, 
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to switch branch: %w", err)
+		// If checkout failed, attempt to create the branch (useful for empty repos)
+		createCmd := exec.CommandContext(ctx, "git", "checkout", "-b", branchName)
+		createCmd.Dir = g.basePath
+		createOut, createErr := createCmd.Output()
+		if createErr != nil {
+			return "", fmt.Errorf("failed to switch branch: %w", err)
+		}
+		return fmt.Sprintf("Successfully created and switched to branch '%s':\n%s", branchName, string(createOut)), nil
 	}
 
 	return fmt.Sprintf("Successfully switched to branch '%s':\n%s", branchName, string(output)), nil

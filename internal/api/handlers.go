@@ -23,8 +23,17 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check request size (10MB limit)
-	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
+	// Max allowable payload size (10MB)
+	const maxPayloadSize = 10 * 1024 * 1024 // 10 MB
+
+	// Fast-path: if Content-Length header is provided and exceeds the limit return 413 immediately.
+	if r.ContentLength > maxPayloadSize {
+		http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	// Wrap body reader to enforce the same limit during streaming reads.
+	r.Body = http.MaxBytesReader(w, r.Body, maxPayloadSize)
 
 	// Parse request
 	var req ChatRequest

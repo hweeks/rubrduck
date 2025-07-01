@@ -92,11 +92,11 @@ This document outlines the remaining implementation tasks to create a fully func
 
 ### 2. VSCode Extension
 
-- [ ] **Core Features**
-  - Connect to RubrDuck server
-  - Inline code suggestions
-  - Selection-based actions
-  - Chat sidebar
+- [x] **Core Features** ✅
+  - Connect to RubrDuck server ✅
+  - Inline code suggestions ✅
+  - Selection-based actions ✅
+  - Chat sidebar ✅
 - [ ] **Advanced Features**
   - Code lens integration
   - Diff view for changes
