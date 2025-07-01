@@ -167,27 +167,32 @@ func (s *ShellTool) validateCommand(command string) error {
 
 // sanitizePath ensures the path is safe and within the project bounds
 func (s *ShellTool) sanitizePath(path string) (string, error) {
-	// Clean the path to remove any .. or . components
-	cleanPath := strings.TrimSpace(path)
+	// Normalize the path
+	cleanPath := filepath.Clean(strings.TrimSpace(path))
 
-	// If it's an absolute path, make it relative to base
-	if strings.HasPrefix(cleanPath, "/") {
-		// For now, only allow relative paths
+	// Disallow absolute paths
+	if filepath.IsAbs(cleanPath) {
 		return "", fmt.Errorf("absolute paths are not allowed")
 	}
 
-	// Join with base path
-	fullPath := cleanPath
-	if !strings.HasPrefix(fullPath, s.basePath) {
-		fullPath = s.basePath + "/" + cleanPath
+	// Join with the base path and get absolute paths for comparison
+	joined := filepath.Join(s.basePath, cleanPath)
+	absJoined, err := filepath.Abs(joined)
+	if err != nil {
+		return "", err
 	}
 
-	// Ensure the final path is within the base path
-	if !strings.HasPrefix(fullPath, s.basePath) {
+	absBase, err := filepath.Abs(s.basePath)
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the resulting path is within the base path
+	if !strings.HasPrefix(absJoined, absBase) {
 		return "", fmt.Errorf("path outside project bounds")
 	}
 
-	return fullPath, nil
+	return absJoined, nil
 }
 
 // executeCommand executes the shell command and captures output
