@@ -33,6 +33,7 @@ type Config struct {
 	API       APIConfig           `mapstructure:"api"`
 	History   HistoryConfig       `mapstructure:"history"`
 	Sandbox   SandboxPolicy       `mapstructure:"sandbox"`
+	Project   ProjectConfig       `mapstructure:"project"`
 	// TUI holds configuration for the terminal user interface
 	TUI TUIConfig `mapstructure:"tui"`
 }
@@ -72,6 +73,12 @@ type HistoryConfig struct {
 	MaxSize           int      `mapstructure:"max_size"`
 	SaveHistory       bool     `mapstructure:"save_history"`
 	SensitivePatterns []string `mapstructure:"sensitive_patterns"`
+}
+
+// ProjectConfig holds project-specific settings
+type ProjectConfig struct {
+	IgnorePaths    []string `mapstructure:"ignore_paths"`
+	CodeExtensions []string `mapstructure:"code_extensions"`
 }
 
 // Load loads the configuration from viper
@@ -155,6 +162,14 @@ func setDefaults() {
 	})
 	viper.SetDefault("sandbox.allowed_env_vars", []string{"PATH", "HOME", "USER", "PWD", "LANG", "LC_ALL"})
 	viper.SetDefault("sandbox.blocked_env_vars", []string{"SUDO_ASKPASS", "SSH_AUTH_SOCK", "GPG_AGENT_INFO"})
+
+	// Project defaults
+	viper.SetDefault("project.ignore_paths", []string{
+		"node_modules", ".git", "vendor", "dist", "build", "*.log", "*.tmp",
+	})
+	viper.SetDefault("project.code_extensions", []string{
+		".go", ".js", ".ts", ".py", ".java", ".cpp", ".c", ".h", ".rs", ".rb", ".php",
+	})
 
 	// TUI defaults
 	viper.SetDefault("tui.start_mode", "")

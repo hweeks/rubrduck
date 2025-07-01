@@ -214,7 +214,11 @@ func (a *Agent) registerDefaultTools() {
 	gitTool := tools.NewGitTool(basePath)
 	a.RegisterTool("git_operations", gitTool)
 
-	log.Debug().Msg("Registered default tools: file_operations, shell_execute, git_operations")
+	// Register project analysis tool
+	projectTool := tools.NewProjectTool(basePath, a.config.Project)
+	a.RegisterTool("project_analyze", projectTool)
+
+	log.Debug().Msg("Registered default tools: file_operations, shell_execute, git_operations, project_analyze")
 }
 
 // getToolDefinitions returns tool definitions for the AI
