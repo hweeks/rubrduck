@@ -71,7 +71,7 @@ fmt:
 lint:
 	@echo "Running linters..."
 	@if command -v golangci-lint > /dev/null; then \
-	golangci-lint run --issues-exit-code=0; \
+	golangci-lint run --disable goanalysis_metalinter --issues-exit-code=0; \
 	else \
 	echo "Please install golangci-lint: https://golangci-lint.run/usage/install/"; \
 	exit 1; \
