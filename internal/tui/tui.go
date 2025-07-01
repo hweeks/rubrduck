@@ -58,8 +58,8 @@ func NewModel(cfg *config.Config) Model {
 		m.viewMode = ViewModeBuilding
 	case "debugging":
 		m.viewMode = ViewModeDebugging
-	case "tech-debt", "tech debt":
-		m.viewMode = ViewModeTechDebt
+	case "enhance", "enhancement", "tech-debt", "tech debt":
+		m.viewMode = ViewModeEnhance
 	default:
 		m.viewMode = ViewModeSelect
 	}
@@ -181,8 +181,8 @@ func (m Model) View() string {
 			body = m.renderBuilding()
 		case ViewModeDebugging:
 			body = m.renderDebugging()
-		case ViewModeTechDebt:
-			body = m.renderTechDebt()
+		case ViewModeEnhance:
+			body = m.renderEnhance()
 		}
 	}
 
@@ -210,7 +210,7 @@ func (m Model) generateSimulatedResponse(query string) Response {
 		ViewModePlanning:  "Based on your request, here's a comprehensive plan for: " + query,
 		ViewModeBuilding:  "Here's a basic implementation plan for: " + query,
 		ViewModeDebugging: "Debug steps for your issue: " + query,
-		ViewModeTechDebt:  "Tech debt assessment for: " + query,
+		ViewModeEnhance:   "Enhancement suggestions for: " + query,
 	}
 	answer, ok := templates[m.viewMode]
 	if !ok {
