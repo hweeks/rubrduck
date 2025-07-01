@@ -152,6 +152,7 @@ RubrDuck offers four workflow modes accessible from the terminal UI:
 ```bash
 rubrduck "explain this codebase"
 rubrduck --mode full-auto "add error handling to all functions"
+rubrduck analyze       # summarize project structure
 ```
 
 ### API Server Mode (for IDE extensions)
