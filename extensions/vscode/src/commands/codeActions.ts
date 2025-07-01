@@ -1,14 +1,19 @@
 import * as vscode from "vscode";
 import { RubrDuckAPI, Message } from "../api/client";
 
-export async function handleExplainCode(api: RubrDuckAPI): Promise<void> {
+export async function handleExplainCode(
+  api: RubrDuckAPI,
+  range?: vscode.Range
+): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     vscode.window.showWarningMessage("No active editor found");
     return;
   }
 
-  const selection = editor.selection;
+  const selection = range
+    ? new vscode.Selection(range.start, range.end)
+    : editor.selection;
   const selectedText = editor.document.getText(selection);
 
   if (!selectedText.trim()) {
@@ -48,14 +53,19 @@ export async function handleExplainCode(api: RubrDuckAPI): Promise<void> {
   }
 }
 
-export async function handleFixCode(api: RubrDuckAPI): Promise<void> {
+export async function handleFixCode(
+  api: RubrDuckAPI,
+  range?: vscode.Range
+): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     vscode.window.showWarningMessage("No active editor found");
     return;
   }
 
-  const selection = editor.selection;
+  const selection = range
+    ? new vscode.Selection(range.start, range.end)
+    : editor.selection;
   const selectedText = editor.document.getText(selection);
 
   if (!selectedText.trim()) {
@@ -288,5 +298,129 @@ function getTestFileName(originalFileName: string, language: string): string {
       return `${nameWithoutExt}Tests.cs`;
     default:
       return `${nameWithoutExt}_test${ext}`;
+  }
+}
+
+export async function handleFixFile(
+  api: RubrDuckAPI,
+  uris?: vscode.Uri | vscode.Uri[]
+): Promise<void> {
+  const targets: vscode.Uri[] = [];
+  if (!uris) {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      targets.push(editor.document.uri);
+    }
+  } else if (Array.isArray(uris)) {
+    targets.push(...uris);
+  } else {
+    targets.push(uris);
+  }
+
+  if (targets.length === 0) {
+    vscode.window.showWarningMessage("No file selected");
+    return;
+  }
+
+  for (const uri of targets) {
+    const doc = await vscode.workspace.openTextDocument(uri);
+    const text = doc.getText();
+    const language = doc.languageId;
+    const fileName = doc.fileName;
+
+    const messages: Message[] = [
+      {
+        role: "system",
+        content:
+          "You are a helpful coding assistant. Fix any issues in the given code and provide the corrected version.",
+      },
+      {
+        role: "user",
+        content: `Please fix any issues in this ${language} code from ${fileName} and provide the corrected version:\n\n\`\`\`${language}\n${text}\n\`\`\``,
+      },
+    ];
+
+    try {
+      const response = await api.sendChat({ messages });
+      const regex = new RegExp(`\`\`\`${language}\\s*\\n([\\s\\S]*?)\\n\`\`\``, "i");
+      const match = response.message.content.match(regex);
+      const fixedCode = match && match[1] ? match[1].trim() : response.message.content;
+
+      const action = await vscode.window.showInformationMessage(
+        `Apply fix to ${fileName}?`,
+        "Apply",
+        "Show Diff",
+        "Skip"
+      );
+
+      if (action === "Apply") {
+        const edit = new vscode.WorkspaceEdit();
+        const fullRange = new vscode.Range(
+          doc.positionAt(0),
+          doc.positionAt(text.length)
+        );
+        edit.replace(uri, fullRange, fixedCode);
+        await vscode.workspace.applyEdit(edit);
+        await doc.save();
+      } else if (action === "Show Diff") {
+        const originalDoc = await vscode.workspace.openTextDocument({
+          content: text,
+          language,
+        });
+        const fixedDoc = await vscode.workspace.openTextDocument({
+          content: fixedCode,
+          language,
+        });
+        await vscode.commands.executeCommand(
+          "vscode.diff",
+          originalDoc.uri,
+          fixedDoc.uri,
+          `${fileName} ↔ Fixed`
+        );
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to fix ${fileName}: ${error}`);
+    }
+  }
+}
+
+export async function handleCustomCommand(
+  api: RubrDuckAPI,
+  prompt: string
+): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    vscode.window.showWarningMessage("No active editor found");
+    return;
+  }
+
+  const selection = editor.selection;
+  const selectedText = editor.document.getText(selection);
+
+  if (!selectedText.trim()) {
+    vscode.window.showWarningMessage("Please select some code to use with the custom command");
+    return;
+  }
+
+  const language = editor.document.languageId;
+  const fileName = editor.document.fileName;
+
+  const messages: Message[] = [
+    { role: "system", content: `You are a helpful coding assistant. ${prompt}` },
+    {
+      role: "user",
+      content: `${prompt} for this ${language} code from ${fileName}:\n\n\`\`\`${language}\n${selectedText}\n\`\`\``,
+    },
+  ];
+
+  try {
+    const response = await api.sendChat({ messages });
+    const doc = await vscode.workspace.openTextDocument({
+      content: response.message.content,
+      language: "markdown",
+    });
+    await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to run custom command: ${error}`);
   }
 }

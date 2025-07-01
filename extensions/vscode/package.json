@@ -48,6 +48,14 @@
       {
         "command": "rubrduck.test",
         "title": "RubrDuck: Generate Tests"
+      },
+      {
+        "command": "rubrduck.fixFile",
+        "title": "RubrDuck: Fix File"
+      },
+      {
+        "command": "rubrduck.custom",
+        "title": "RubrDuck: Custom Command"
       }
     ],
     "menus": {
@@ -61,6 +69,14 @@
           "command": "rubrduck.fix",
           "group": "rubrduck",
           "when": "editorHasSelection"
+        },
+        {
+          "command": "rubrduck.fixFile",
+          "group": "rubrduck"
+        },
+        {
+          "command": "rubrduck.custom",
+          "group": "rubrduck"
         }
       ]
     },
@@ -81,6 +97,16 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically start RubrDuck server on VSCode startup"
+        },
+        "rubrduck.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable RubrDuck CodeLens annotations"
+        },
+        "rubrduck.customCommands": {
+          "type": "array",
+          "default": [],
+          "description": "Custom commands to show in the RubrDuck command picker. Each item should have 'name' and 'prompt'."
         }
       }
     },
