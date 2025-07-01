@@ -196,7 +196,7 @@ func TestServer_GracefulShutdown(t *testing.T) {
 
 	go func() {
 		req, _ := http.NewRequestWithContext(reqCtx, http.MethodGet, "http://"+addr+"/slow", nil)
-		client.Do(req)
+		_, _ = client.Do(req)
 	}()
 
 	// Give request time to start

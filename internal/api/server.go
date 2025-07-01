@@ -63,12 +63,12 @@ func (s *Server) Start(ctx context.Context) error {
 
 		// Start server in goroutine
 		go func() {
-			s.server.Serve(listener)
+			_ = s.server.Serve(listener)
 		}()
 	} else {
 		// Start server in goroutine
 		go func() {
-			s.server.ListenAndServe()
+			_ = s.server.ListenAndServe()
 		}()
 	}
 
@@ -153,7 +153,7 @@ func (s *Server) setupRoutes() http.Handler {
 // handleHealth handles health check requests
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }
 
 // handleWebSocket handles WebSocket upgrade requests

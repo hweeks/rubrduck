@@ -38,21 +38,21 @@ var (
 			Bold(true).
 			Padding(0, 1)
 
-	riskLowStyle = riskStyle.Copy().
-			Foreground(lipgloss.Color("86")).
-			Background(lipgloss.Color("22"))
+	riskLowStyle = riskStyle.
+		Foreground(lipgloss.Color("86")).
+		Background(lipgloss.Color("22"))
 
-	riskMediumStyle = riskStyle.Copy().
-			Foreground(lipgloss.Color("226")).
-			Background(lipgloss.Color("58"))
+	riskMediumStyle = riskStyle.
+		Foreground(lipgloss.Color("226")).
+		Background(lipgloss.Color("58"))
 
-	riskHighStyle = riskStyle.Copy().
-			Foreground(lipgloss.Color("208")).
-			Background(lipgloss.Color("52"))
+	riskHighStyle = riskStyle.
+		Foreground(lipgloss.Color("208")).
+		Background(lipgloss.Color("52"))
 
-	riskCriticalStyle = riskStyle.Copy().
-				Foreground(lipgloss.Color("196")).
-				Background(lipgloss.Color("52"))
+	riskCriticalStyle = riskStyle.
+		Foreground(lipgloss.Color("196")).
+		Background(lipgloss.Color("52"))
 
 	previewStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -65,14 +65,14 @@ var (
 			Padding(0, 2).
 			Margin(0, 1)
 
-	buttonSelectedStyle = buttonStyle.Copy().
-				Foreground(lipgloss.Color("15")).
-				Background(lipgloss.Color("205")).
-				BorderForeground(lipgloss.Color("205"))
+	buttonSelectedStyle = buttonStyle.
+		Foreground(lipgloss.Color("15")).
+		Background(lipgloss.Color("205")).
+		BorderForeground(lipgloss.Color("205"))
 
-	buttonUnselectedStyle = buttonStyle.Copy().
-				Foreground(lipgloss.Color("240")).
-				BorderForeground(lipgloss.Color("240"))
+	buttonUnselectedStyle = buttonStyle.
+		Foreground(lipgloss.Color("240")).
+		BorderForeground(lipgloss.Color("240"))
 
 	descriptionStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("252")).

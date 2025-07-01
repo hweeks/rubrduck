@@ -74,9 +74,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&approvalMode, "approval-mode", "a", "suggest", "Approval mode: suggest, auto-edit, or full-auto")
 
 	// Bind flags to viper
-	viper.BindPFlag("provider", rootCmd.PersistentFlags().Lookup("provider"))
-	viper.BindPFlag("model", rootCmd.PersistentFlags().Lookup("model"))
-	viper.BindPFlag("agent.approval_mode", rootCmd.PersistentFlags().Lookup("approval-mode"))
+   _ = viper.BindPFlag("provider", rootCmd.PersistentFlags().Lookup("provider"))
+   _ = viper.BindPFlag("model", rootCmd.PersistentFlags().Lookup("model"))
+   _ = viper.BindPFlag("agent.approval_mode", rootCmd.PersistentFlags().Lookup("approval-mode"))
 
 	// Add subcommands
 	rootCmd.AddCommand(serveCmd)

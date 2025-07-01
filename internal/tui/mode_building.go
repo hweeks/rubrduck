@@ -3,8 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // renderBuilding renders the building mode view
@@ -46,27 +44,4 @@ func (m Model) renderBuilding() string {
 	}
 
 	return b.String()
-}
-
-// updateBuilding handles events in building mode
-func (m Model) updateBuilding(msg tea.Msg) (Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEscape:
-			m.viewMode = ViewModeSelect
-		case tea.KeyUp:
-			if m.scrollOffset > 0 {
-				m.scrollOffset--
-			}
-		case tea.KeyDown:
-			if m.scrollOffset < len(m.responses)-1 {
-				m.scrollOffset++
-			}
-		}
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-	}
-	return m, nil
 }

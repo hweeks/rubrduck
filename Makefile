@@ -1,4 +1,11 @@
 .PHONY: build run test clean install dev lint fmt
+# Use Homebrew Go if installed at standard locations
+ifneq ("$(wildcard /opt/homebrew/opt/go/libexec/bin)","")
+    export PATH := /opt/homebrew/opt/go/libexec/bin:$(PATH)
+endif
+ifneq ("$(wildcard /usr/local/opt/go/libexec/bin)","")
+    export PATH := /usr/local/opt/go/libexec/bin:$(PATH)
+endif
 
 # Variables
 BINARY_NAME=rubrduck
@@ -71,7 +78,7 @@ fmt:
 lint:
 	@echo "Running linters..."
 	@if command -v golangci-lint > /dev/null; then \
-	golangci-lint run --disable goanalysis_metalinter --issues-exit-code=0; \
+	golangci-lint run --no-config --issues-exit-code=0; \
 	else \
 	echo "Please install golangci-lint: https://golangci-lint.run/usage/install/"; \
 	exit 1; \

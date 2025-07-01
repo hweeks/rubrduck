@@ -95,7 +95,7 @@ func TestRateLimiterMiddleware(t *testing.T) {
 
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 
 	t.Run("allows requests within limit", func(t *testing.T) {
