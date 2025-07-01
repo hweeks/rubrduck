@@ -149,10 +149,29 @@ func (p *AnthropicProvider) convertRequest(req *ai.ChatRequest) map[string]inter
 	// Convert messages to Anthropic format
 	messages := make([]map[string]interface{}, len(req.Messages))
 	for i, msg := range req.Messages {
-		messages[i] = map[string]interface{}{
-			"role":    msg.Role,
-			"content": msg.Content,
+		m := map[string]interface{}{
+			"role": msg.Role,
 		}
+		if len(msg.Parts) > 0 {
+			parts := make([]map[string]interface{}, len(msg.Parts))
+			for j, part := range msg.Parts {
+				if part.Type == "image_url" {
+					parts[j] = map[string]interface{}{
+						"type":   "image",
+						"source": map[string]interface{}{"data": part.ImageURL, "media_type": "image/png"},
+					}
+				} else {
+					parts[j] = map[string]interface{}{
+						"type": "text",
+						"text": part.Text,
+					}
+				}
+			}
+			m["content"] = parts
+		} else {
+			m["content"] = msg.Content
+		}
+		messages[i] = m
 	}
 
 	anthropicReq := map[string]interface{}{

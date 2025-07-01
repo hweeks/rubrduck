@@ -145,14 +145,30 @@ func (p *GeminiProvider) convertRequest(req *ai.ChatRequest) map[string]interfac
 	// Convert messages to Gemini format
 	contents := make([]map[string]interface{}, len(req.Messages))
 	for i, msg := range req.Messages {
-		contents[i] = map[string]interface{}{
+		m := map[string]interface{}{
 			"role": msg.Role,
-			"parts": []map[string]interface{}{
-				{
-					"text": msg.Content,
-				},
-			},
 		}
+		parts := []map[string]interface{}{}
+		if len(msg.Parts) > 0 {
+			for _, part := range msg.Parts {
+				if part.Type == "image_url" {
+					parts = append(parts, map[string]interface{}{
+						"inline_data": map[string]interface{}{
+							"mime_type": "image/png",
+							"data":      part.ImageURL,
+						},
+					})
+				} else {
+					parts = append(parts, map[string]interface{}{
+						"text": part.Text,
+					})
+				}
+			}
+		} else {
+			parts = append(parts, map[string]interface{}{"text": msg.Content})
+		}
+		m["parts"] = parts
+		contents[i] = m
 	}
 
 	geminiReq := map[string]interface{}{
