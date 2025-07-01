@@ -77,6 +77,10 @@ lint:
 		exit 1; \
 	fi
 
+cli-run:
+	@echo "Running CLI..."
+	go run cmd/rubrduck/main.go
+
 # Download dependencies
 deps:
 	@echo "Downloading dependencies..."

@@ -74,3 +74,4 @@ extensions/*/*.vsix
 # Temporary files
 *.tmp
 *.temp 
+rubrduck
