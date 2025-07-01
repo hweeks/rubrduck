@@ -79,7 +79,8 @@ func (r *RateLimiter) Allow(key string) bool {
 	// Refill tokens based on time elapsed
 	now := time.Now()
 	elapsed := now.Sub(b.lastFill).Seconds()
-	tokensToAdd := elapsed * (float64(limit) / 60.0)
+	tokensPerSecond := float64(limit) / 6.0
+	tokensToAdd := elapsed * tokensPerSecond
 	b.tokens = min(float64(burst), b.tokens+tokensToAdd)
 	b.lastFill = now
 	b.lastUsed = now
