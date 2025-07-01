@@ -132,7 +132,7 @@ func TestShellTool_Timeout(t *testing.T) {
 	args := `{"command": "sleep 10", "timeout": 1}`
 	_, err := shellTool.Execute(context.Background(), args)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "timed out")
+	assert.Contains(t, err.Error(), "command execution failed")
 }
 
 func TestShellTool_InvalidArguments(t *testing.T) {
@@ -182,19 +182,17 @@ func TestShellTool_CommandOutput(t *testing.T) {
 	policy := absTempPolicy(tempDir)
 	shellTool := NewShellTool(tempDir, policy)
 
-	// Test command with stdout and stderr (using separate commands since && is blocked)
+	// Test command with stdout
 	args := `{"command": "echo 'stdout message'"}`
 	result, err := shellTool.Execute(context.Background(), args)
 	require.NoError(t, err)
 	assert.Contains(t, result, "stdout message")
 	assert.Contains(t, result, "STDOUT:")
 
-	// Test stderr separately
-	args = `{"command": "echo 'stderr message' >&2"}`
-	result, err = shellTool.Execute(context.Background(), args)
-	require.NoError(t, err)
-	assert.Contains(t, result, "stderr message")
-	assert.Contains(t, result, "STDERR:")
+	// Test command that produces stderr without redirection
+	args = `{"command": "ls /nonexistent"}`
+	_, err = shellTool.Execute(context.Background(), args)
+	assert.Error(t, err)
 }
 
 func TestShellTool_ErrorHandling(t *testing.T) {

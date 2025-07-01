@@ -150,7 +150,7 @@ func TestAuthMiddleware(t *testing.T) {
 					assert.Equal(t, tt.expectedUser, user.ID)
 				}
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("OK"))
+				_, _ = w.Write([]byte("OK"))
 			})
 
 			// Create auth middleware
@@ -371,7 +371,7 @@ func TestMultipleAuthMethods(t *testing.T) {
 	handler := authMiddleware.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := GetUserFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(user.ID))
+		_, _ = w.Write([]byte(user.ID))
 	}))
 
 	t.Run("auth with bearer token", func(t *testing.T) {

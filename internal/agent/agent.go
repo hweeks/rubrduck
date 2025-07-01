@@ -110,9 +110,7 @@ func (a *Agent) Chat(ctx context.Context, message string) (string, error) {
 		toolResults := a.executeToolCalls(ctx, assistantMsg.ToolCalls)
 
 		// Add tool results to history
-		for _, result := range toolResults {
-			a.history = append(a.history, result)
-		}
+		a.history = append(a.history, toolResults...)
 
 		// Get final response after tool execution
 		req.Messages = a.history

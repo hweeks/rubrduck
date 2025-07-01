@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,16 +77,25 @@ func TestServer_Start_Stop(t *testing.T) {
 		errCh <- server.Start(ctx)
 	}()
 
-	// Give server time to start
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify server is running
-	addr := server.GetAddress()
-	assert.NotEmpty(t, addr)
-
-	resp, err := http.Get("http://" + addr + "/health")
+	// Wait for server to start
+	var resp *http.Response
+	var addr string
+	for i := 0; i < 10; i++ {
+		addr = server.GetAddress()
+		if addr != "" && !strings.HasSuffix(addr, ":0") {
+			url := addr
+			if strings.HasPrefix(addr, "[::]:") {
+				url = "127.0.0.1" + addr[4:]
+			}
+			resp, err = http.Get("http://" + url + "/health")
+			if err == nil && resp.StatusCode == http.StatusOK {
+				break
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 
 	// Stop server
@@ -186,7 +196,7 @@ func TestServer_GracefulShutdown(t *testing.T) {
 
 	go func() {
 		req, _ := http.NewRequestWithContext(reqCtx, http.MethodGet, "http://"+addr+"/slow", nil)
-		client.Do(req)
+		_, _ = client.Do(req)
 	}()
 
 	// Give request time to start

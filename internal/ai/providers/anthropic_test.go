@@ -97,7 +97,7 @@ func TestAnthropicProvider_Chat(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+               _ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 

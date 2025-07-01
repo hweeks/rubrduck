@@ -76,7 +76,7 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 
 	// Send response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // HandleStream handles streaming chat requests
@@ -194,7 +194,7 @@ func (h *Handler) HandleTools(w http.ResponseWriter, r *http.Request) {
 				ID:    fmt.Sprintf("tool-%d", time.Now().UnixNano()),
 				Error: "Access denied: cannot read sensitive files",
 			}
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
 
@@ -204,7 +204,7 @@ func (h *Handler) HandleTools(w http.ResponseWriter, r *http.Request) {
 			Result: "File content would be here",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 
 	default:
 		http.Error(w, "Unknown tool: "+req.Name, http.StatusBadRequest)
@@ -249,7 +249,7 @@ func (h *Handler) HandleHistory(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 		return
 	}
 
@@ -284,5 +284,5 @@ func (h *Handler) HandleHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }

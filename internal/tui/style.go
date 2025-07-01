@@ -34,7 +34,7 @@ var (
 			Padding(0, 2)
 
 	// InputFocusedStyle highlights the input field
-	InputFocusedStyle = InputStyle.Copy().
+	InputFocusedStyle = InputStyle.
 				BorderLeft(true).
 				BorderLeftForeground(primaryColor)
 

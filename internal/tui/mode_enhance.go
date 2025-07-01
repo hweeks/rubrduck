@@ -3,8 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // renderEnhance renders the enhance mode view
@@ -46,27 +44,4 @@ func (m Model) renderEnhance() string {
 	}
 
 	return b.String()
-}
-
-// updateEnhance handles events in enhance mode
-func (m Model) updateEnhance(msg tea.Msg) (Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEscape:
-			m.viewMode = ViewModeSelect
-		case tea.KeyUp:
-			if m.scrollOffset > 0 {
-				m.scrollOffset--
-			}
-		case tea.KeyDown:
-			if m.scrollOffset < len(m.responses)-1 {
-				m.scrollOffset++
-			}
-		}
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-	}
-	return m, nil
 }
