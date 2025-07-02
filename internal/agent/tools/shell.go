@@ -49,19 +49,23 @@ func (s *ShellTool) GetDefinition() ai.Tool {
 			Name:        "shell_execute",
 			Description: "Execute shell commands with security restrictions and approval handling",
 			Parameters: map[string]interface{}{
-				"command": map[string]interface{}{
-					"type":        "string",
-					"description": "The shell command to execute",
+				"type": "object",
+				"properties": map[string]interface{}{
+					"command": map[string]interface{}{
+						"type":        "string",
+						"description": "The shell command to execute",
+					},
+					"timeout": map[string]interface{}{
+						"type":        "integer",
+						"description": "Timeout in seconds (default: 30)",
+						"default":     30,
+					},
+					"working_dir": map[string]interface{}{
+						"type":        "string",
+						"description": "Working directory for command execution (relative to project root)",
+					},
 				},
-				"timeout": map[string]interface{}{
-					"type":        "integer",
-					"description": "Timeout in seconds (default: 30)",
-					"default":     30,
-				},
-				"working_dir": map[string]interface{}{
-					"type":        "string",
-					"description": "Working directory for command execution (relative to project root)",
-				},
+				"required": []string{"command"},
 			},
 		},
 	}

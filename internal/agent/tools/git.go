@@ -34,24 +34,28 @@ func (g *GitTool) GetDefinition() ai.Tool {
 			Name:        "git_operations",
 			Description: "Perform Git operations including status, diff, commit, and branch management",
 			Parameters: map[string]interface{}{
-				"operation": map[string]interface{}{
-					"type":        "string",
-					"enum":        []string{"status", "diff", "commit", "branch", "log", "remote"},
-					"description": "The Git operation to perform",
+				"type": "object",
+				"properties": map[string]interface{}{
+					"operation": map[string]interface{}{
+						"type":        "string",
+						"enum":        []string{"status", "diff", "commit", "branch", "log", "remote"},
+						"description": "The Git operation to perform",
+					},
+					"args": map[string]interface{}{
+						"type":        "string",
+						"description": "Additional arguments for the operation (e.g., commit message, branch name)",
+					},
+					"file": map[string]interface{}{
+						"type":        "string",
+						"description": "Specific file to operate on (for diff, status, etc.)",
+					},
+					"max_lines": map[string]interface{}{
+						"type":        "integer",
+						"description": "Maximum number of lines to return (for log, diff, etc.)",
+						"default":     100,
+					},
 				},
-				"args": map[string]interface{}{
-					"type":        "string",
-					"description": "Additional arguments for the operation (e.g., commit message, branch name)",
-				},
-				"file": map[string]interface{}{
-					"type":        "string",
-					"description": "Specific file to operate on (for diff, status, etc.)",
-				},
-				"max_lines": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum number of lines to return (for log, diff, etc.)",
-					"default":     100,
-				},
+				"required": []string{"operation"},
 			},
 		},
 	}

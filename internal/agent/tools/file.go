@@ -1,14 +1,14 @@
 package tools
 
 import (
-   "context"
-   "encoding/json"
-   "errors"
-   "fmt"
-   "io/fs"
-   "os"
-   "path/filepath"
-   "strings"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/hammie/rubrduck/internal/ai"
 	"github.com/rs/zerolog/log"
@@ -34,28 +34,32 @@ func (f *FileTool) GetDefinition() ai.Tool {
 			Name:        "file_operations",
 			Description: "Perform file system operations including read, write, list, and search",
 			Parameters: map[string]interface{}{
-				"type": map[string]interface{}{
-					"type":        "string",
-					"enum":        []string{"read", "write", "list", "search"},
-					"description": "The type of file operation to perform",
+				"type": "object",
+				"properties": map[string]interface{}{
+					"type": map[string]interface{}{
+						"type":        "string",
+						"enum":        []string{"read", "write", "list", "search"},
+						"description": "The type of file operation to perform",
+					},
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "The file or directory path (relative to project root)",
+					},
+					"content": map[string]interface{}{
+						"type":        "string",
+						"description": "Content to write to file (only for write operations)",
+					},
+					"pattern": map[string]interface{}{
+						"type":        "string",
+						"description": "Search pattern for file search (only for search operations)",
+					},
+					"max_results": map[string]interface{}{
+						"type":        "integer",
+						"description": "Maximum number of results to return (for list and search operations)",
+						"default":     50,
+					},
 				},
-				"path": map[string]interface{}{
-					"type":        "string",
-					"description": "The file or directory path (relative to project root)",
-				},
-				"content": map[string]interface{}{
-					"type":        "string",
-					"description": "Content to write to file (only for write operations)",
-				},
-				"pattern": map[string]interface{}{
-					"type":        "string",
-					"description": "Search pattern for file search (only for search operations)",
-				},
-				"max_results": map[string]interface{}{
-					"type":        "integer",
-					"description": "Maximum number of results to return (for list and search operations)",
-					"default":     50,
-				},
+				"required": []string{"type", "path"},
 			},
 		},
 	}
@@ -222,9 +226,9 @@ func (f *FileTool) searchFiles(basePath, pattern string, maxResults int) (string
 		return "", fmt.Errorf("search pattern is required")
 	}
 
-   var results []string
-   stopErr := errors.New("stop search")
-   err := filepath.WalkDir(basePath, func(path string, d fs.DirEntry, err error) error {
+	var results []string
+	stopErr := errors.New("stop search")
+	err := filepath.WalkDir(basePath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil // Skip files we can't access
 		}
@@ -245,19 +249,19 @@ func (f *FileTool) searchFiles(basePath, pattern string, maxResults int) (string
 		}
 
 		// Stop if we have enough results
-       if len(results) >= maxResults {
-           return stopErr
-       }
+		if len(results) >= maxResults {
+			return stopErr
+		}
 
 		return nil
 	})
 
-   if err != nil && err == stopErr {
-       err = nil
-   }
-   if err != nil {
-       return "", fmt.Errorf("search failed: %w", err)
-   }
+	if err != nil && err == stopErr {
+		err = nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("search failed: %w", err)
+	}
 
 	if len(results) == 0 {
 		return fmt.Sprintf("No files found matching pattern '%s' in %s", pattern, basePath), nil
