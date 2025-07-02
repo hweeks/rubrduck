@@ -154,7 +154,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, tea.Tick(time.Millisecond*10, func(t time.Time) tea.Msg {
 						return responseFinishedMsg{resp: m.generateSimulatedResponse(q)}
 					}))
-					m.adjustScrollToBottom()
 				}
 			}
 		} else {

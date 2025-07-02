@@ -1,15 +1,16 @@
 package commands
 
 import (
-	"fmt"
-	"os"
-	"strings"
+   "fmt"
+   "os"
+   "strings"
 
-	"github.com/hammie/rubrduck/internal/config"
-	"github.com/hammie/rubrduck/internal/tui"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+   "github.com/hammie/rubrduck/internal/config"
+   "github.com/hammie/rubrduck/internal/tui"
+   tui2 "github.com/hammie/rubrduck/internal/tui2"
+   "github.com/rs/zerolog/log"
+   "github.com/spf13/cobra"
+   "github.com/spf13/viper"
 )
 
 var (
@@ -150,6 +151,6 @@ func runInteractiveTUI() error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Start the TUI
-	return tui.Run(cfg)
+   // Start the interactive Bubble Tea–based TUI
+   return tui2.Run(cfg)
 }
