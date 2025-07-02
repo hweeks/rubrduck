@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hammie/rubrduck/internal/ai"
+	"github.com/hammie/rubrduck/internal/agent"
 )
 
 // GetEnhanceSystemPrompt returns the system prompt for enhancement mode
@@ -50,30 +50,26 @@ ENHANCEMENT STRATEGIES:
 • Update dependencies and adopt modern language features
 • Optimize data structures and algorithms for better performance
 
+TOOLS AVAILABLE:
+You have access to file operations (read, write, list, search), shell execution, and git operations.
+Use file_operations to read files from the user's computer to analyze the current code quality.
+Use shell_execute to run analysis tools and git_operations to examine code evolution.
+
 Remember: The best enhancements improve code quality while maintaining or improving functionality. Always consider the long-term maintainability of your changes.`
 }
 
-// ProcessEnhanceRequest handles AI requests for enhancement mode
-func ProcessEnhanceRequest(ctx context.Context, provider ai.Provider, userInput, model string) (*ai.ChatResponse, error) {
-	request := &ai.ChatRequest{
-		Model: model,
-		Messages: []ai.Message{
-			{
-				Role:    "system",
-				Content: GetEnhanceSystemPrompt(),
-			},
-			{
-				Role:    "user",
-				Content: userInput,
-			},
-		},
-		Temperature: 0.4, // Moderate temperature for balanced creativity and precision
-		MaxTokens:   4000,
-	}
+// ProcessEnhanceRequest handles AI requests for enhancement mode using the agent
+func ProcessEnhanceRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (string, error) {
+	// Clear agent history and set system context
+	agent.ClearHistory()
 
-	response, err := provider.Chat(ctx, request)
+	// Create a combined input with system context
+	contextualInput := fmt.Sprintf("System context: %s\n\nUser request: %s", GetEnhanceSystemPrompt(), userInput)
+
+	// Use agent.Chat which has access to tools including file reading
+	response, err := agent.Chat(ctx, contextualInput)
 	if err != nil {
-		return nil, fmt.Errorf("enhancement mode AI request failed: %w", err)
+		return "", fmt.Errorf("enhancement mode AI request failed: %w", err)
 	}
 
 	return response, nil

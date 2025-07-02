@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hammie/rubrduck/internal/ai"
+	"github.com/hammie/rubrduck/internal/agent"
 )
 
 // this mode should be looking for a plan and then working on it, update the steps it has completed as it does them. it should try hard to make chages that will create a clean git history
@@ -42,30 +42,26 @@ DEVELOPMENT BEST PRACTICES:
 • Follow existing code patterns and conventions in the project
 • Consider performance and scalability implications
 
+TOOLS AVAILABLE:
+You have access to file operations (read, write, list, search), shell execution, and git operations.
+Use file_operations to read files from the user's computer when you need to understand existing code.
+Use shell_execute to run commands and git_operations for version control.
+
 Remember: Great code is not just working code - it's code that other developers can understand, maintain, and extend.`
 }
 
-// ProcessBuildingRequest handles AI requests for building mode
-func ProcessBuildingRequest(ctx context.Context, provider ai.Provider, userInput, model string) (*ai.ChatResponse, error) {
-	request := &ai.ChatRequest{
-		Model: model,
-		Messages: []ai.Message{
-			{
-				Role:    "system",
-				Content: GetBuildingSystemPrompt(),
-			},
-			{
-				Role:    "user",
-				Content: userInput,
-			},
-		},
-		Temperature: 0.3, // Lower temperature for more focused code generation
-		MaxTokens:   4000,
-	}
+// ProcessBuildingRequest handles AI requests for building mode using the agent
+func ProcessBuildingRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (string, error) {
+	// Clear agent history and set system context
+	agent.ClearHistory()
 
-	response, err := provider.Chat(ctx, request)
+	// Create a combined input with system context
+	contextualInput := fmt.Sprintf("System context: %s\n\nUser request: %s", GetBuildingSystemPrompt(), userInput)
+
+	// Use agent.Chat which has access to tools including file reading
+	response, err := agent.Chat(ctx, contextualInput)
 	if err != nil {
-		return nil, fmt.Errorf("building mode AI request failed: %w", err)
+		return "", fmt.Errorf("building mode AI request failed: %w", err)
 	}
 
 	return response, nil

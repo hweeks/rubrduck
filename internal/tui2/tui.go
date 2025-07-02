@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/hammie/rubrduck/internal/ai"
+	"github.com/hammie/rubrduck/internal/agent"
 	_ "github.com/hammie/rubrduck/internal/ai/providers" // Register AI providers
 	"github.com/hammie/rubrduck/internal/config"
 )
@@ -74,17 +74,14 @@ var modes = []ModeInfo{
 
 // Run starts the Bubble Tea program for the interactive TUI.
 func Run(cfg *config.Config) error {
-	// Initialize AI provider
-	provider, err := ai.GetProvider(cfg.Provider, map[string]interface{}{
-		"api_key":  cfg.Providers[cfg.Provider].APIKey,
-		"base_url": cfg.Providers[cfg.Provider].BaseURL,
-	})
+	// Initialize AI agent with tools
+	agent, err := agent.New(cfg)
 	if err != nil {
 		return err
 	}
 
 	p := tea.NewProgram(
-		newModel(cfg, provider),
+		newModel(cfg, agent),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
@@ -116,12 +113,12 @@ type model struct {
 	height int
 
 	// AI integration
-	config   *config.Config
-	provider ai.Provider
+	config *config.Config
+	agent  *agent.Agent
 }
 
 // newModel initializes the TUI model with default components.
-func newModel(cfg *config.Config, provider ai.Provider) model {
+func newModel(cfg *config.Config, agent *agent.Agent) model {
 	// Spinner for AI thinking indicator
 	s := spinner.New()
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -146,7 +143,7 @@ func newModel(cfg *config.Config, provider ai.Provider) model {
 		loading:        false,
 		userScrolling:  false,
 		config:         cfg,
-		provider:       provider,
+		agent:          agent,
 	}
 }
 
@@ -326,7 +323,7 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			return m, tea.Batch(
 				spinner.Tick,
-				makeAIRequest(userText, m.viewMode, m.provider, m.config.Model),
+				makeAIRequest(userText, m.viewMode, m.agent, m.config.Model),
 			)
 		}
 	}
@@ -481,25 +478,25 @@ type respondMsg struct {
 	err      error
 }
 
-// makeAIRequest processes user input through the appropriate AI mode
-func makeAIRequest(input string, mode ViewMode, provider ai.Provider, model string) tea.Cmd {
+// makeAIRequest processes user input through the agent with tools
+func makeAIRequest(input string, mode ViewMode, agent *agent.Agent, model string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
-		var response *ai.ChatResponse
+		var response string
 		var err error
 
 		// Route to appropriate mode processor
 		switch mode {
 		case ViewModePlanning:
-			response, err = ProcessPlanningRequest(ctx, provider, input, model)
+			response, err = ProcessPlanningRequest(ctx, agent, input, model)
 		case ViewModeBuilding:
-			response, err = ProcessBuildingRequest(ctx, provider, input, model)
+			response, err = ProcessBuildingRequest(ctx, agent, input, model)
 		case ViewModeDebugging:
-			response, err = ProcessDebuggingRequest(ctx, provider, input, model)
+			response, err = ProcessDebuggingRequest(ctx, agent, input, model)
 		case ViewModeEnhance:
-			response, err = ProcessEnhanceRequest(ctx, provider, input, model)
+			response, err = ProcessEnhanceRequest(ctx, agent, input, model)
 		default:
 			err = fmt.Errorf("unknown mode: %v", mode)
 		}
@@ -512,16 +509,8 @@ func makeAIRequest(input string, mode ViewMode, provider ai.Provider, model stri
 			}
 		}
 
-		// Extract response content
-		var content string
-		if len(response.Choices) > 0 {
-			content = response.Choices[0].Message.Content
-		} else {
-			content = "No response generated."
-		}
-
 		return respondMsg{
-			response: content,
+			response: response,
 			mode:     mode,
 			err:      nil,
 		}

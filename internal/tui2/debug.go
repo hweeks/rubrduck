@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hammie/rubrduck/internal/ai"
+	"github.com/hammie/rubrduck/internal/agent"
 )
 
 // this should be a series of prompts that instruct the agent to carefully debug a problem and provide a detailed plan for how to fix it. it should focus on things like full context in a single document and concise planning, then it should look at the codebase to validate all assumptions and then provide a detailed plan for how to fix the problem.
@@ -51,30 +51,26 @@ SOLUTION QUALITY:
 • Add tests to prevent regression
 • Document the issue and solution for future reference
 
+TOOLS AVAILABLE:
+You have access to file operations (read, write, list, search), shell execution, and git operations.
+Use file_operations to read files from the user's computer to examine the problematic code.
+Use shell_execute to run diagnostic commands and git_operations to examine code history.
+
 Remember: Effective debugging is about being methodical, not just fast. Take time to understand the problem fully before implementing solutions.`
 }
 
-// ProcessDebuggingRequest handles AI requests for debugging mode
-func ProcessDebuggingRequest(ctx context.Context, provider ai.Provider, userInput, model string) (*ai.ChatResponse, error) {
-	request := &ai.ChatRequest{
-		Model: model,
-		Messages: []ai.Message{
-			{
-				Role:    "system",
-				Content: GetDebuggingSystemPrompt(),
-			},
-			{
-				Role:    "user",
-				Content: userInput,
-			},
-		},
-		Temperature: 0.2, // Very low temperature for systematic debugging
-		MaxTokens:   4000,
-	}
+// ProcessDebuggingRequest handles AI requests for debugging mode using the agent
+func ProcessDebuggingRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (string, error) {
+	// Clear agent history and set system context
+	agent.ClearHistory()
 
-	response, err := provider.Chat(ctx, request)
+	// Create a combined input with system context
+	contextualInput := fmt.Sprintf("System context: %s\n\nUser request: %s", GetDebuggingSystemPrompt(), userInput)
+
+	// Use agent.Chat which has access to tools including file reading
+	response, err := agent.Chat(ctx, contextualInput)
 	if err != nil {
-		return nil, fmt.Errorf("debugging mode AI request failed: %w", err)
+		return "", fmt.Errorf("debugging mode AI request failed: %w", err)
 	}
 
 	return response, nil

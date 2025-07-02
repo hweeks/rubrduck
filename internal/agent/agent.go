@@ -242,9 +242,9 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []ai.ToolCall) [
 		tool, ok := a.tools[call.Function.Name]
 		if !ok {
 			results = append(results, ai.Message{
-				Role:    "tool",
-				Content: fmt.Sprintf("Error: Unknown tool '%s'", call.Function.Name),
-				Name:    call.ID,
+				Role:       "tool",
+				Content:    fmt.Sprintf("Error: Unknown tool '%s'", call.Function.Name),
+				ToolCallID: call.ID,
 			})
 			continue
 		}
@@ -253,18 +253,18 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []ai.ToolCall) [
 		approvalResult, err := a.approvalSystem.RequestApproval(ctx, call.Function.Name, call.Function.Arguments, call)
 		if err != nil {
 			results = append(results, ai.Message{
-				Role:    "tool",
-				Content: fmt.Sprintf("Error: Approval failed for %s: %v", call.Function.Name, err),
-				Name:    call.ID,
+				Role:       "tool",
+				Content:    fmt.Sprintf("Error: Approval failed for %s: %v", call.Function.Name, err),
+				ToolCallID: call.ID,
 			})
 			continue
 		}
 
 		if !approvalResult.Approved {
 			results = append(results, ai.Message{
-				Role:    "tool",
-				Content: fmt.Sprintf("Operation denied: %s", approvalResult.Reason),
-				Name:    call.ID,
+				Role:       "tool",
+				Content:    fmt.Sprintf("Operation denied: %s", approvalResult.Reason),
+				ToolCallID: call.ID,
 			})
 			continue
 		}
@@ -273,15 +273,15 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []ai.ToolCall) [
 		result, err := tool.Execute(ctx, call.Function.Arguments)
 		if err != nil {
 			results = append(results, ai.Message{
-				Role:    "tool",
-				Content: fmt.Sprintf("Error executing %s: %v", call.Function.Name, err),
-				Name:    call.ID,
+				Role:       "tool",
+				Content:    fmt.Sprintf("Error executing %s: %v", call.Function.Name, err),
+				ToolCallID: call.ID,
 			})
 		} else {
 			results = append(results, ai.Message{
-				Role:    "tool",
-				Content: result,
-				Name:    call.ID,
+				Role:       "tool",
+				Content:    result,
+				ToolCallID: call.ID,
 			})
 		}
 	}

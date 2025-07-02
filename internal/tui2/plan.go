@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hammie/rubrduck/internal/ai"
+	"github.com/hammie/rubrduck/internal/agent"
 )
 
 // this should be a mode that injects long prompts about planning a project and how to write a plan and what its value it. it should focus on things like full context in a single document and concise planning
@@ -35,30 +35,26 @@ PLANNING OUTPUT FORMAT:
 • Highlight critical dependencies and potential blockers
 • Suggest testing and validation strategies
 
+TOOLS AVAILABLE:
+You have access to file operations (read, write, list, search), shell execution, and git operations.
+Use file_operations to read files from the user's computer when you need to understand the existing codebase.
+Use shell_execute to run commands and git_operations to examine the project's git history.
+
 Remember: Great planning prevents poor performance. Take time to think through the full context before providing your structured plan.`
 }
 
-// ProcessPlanningRequest handles AI requests for planning mode
-func ProcessPlanningRequest(ctx context.Context, provider ai.Provider, userInput, model string) (*ai.ChatResponse, error) {
-	request := &ai.ChatRequest{
-		Model: model,
-		Messages: []ai.Message{
-			{
-				Role:    "system",
-				Content: GetPlanningSystemPrompt(),
-			},
-			{
-				Role:    "user",
-				Content: userInput,
-			},
-		},
-		Temperature: 0.7,
-		MaxTokens:   4000,
-	}
+// ProcessPlanningRequest handles AI requests for planning mode using the agent
+func ProcessPlanningRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (string, error) {
+	// Clear agent history and set system context
+	agent.ClearHistory()
 
-	response, err := provider.Chat(ctx, request)
+	// Create a combined input with system context
+	contextualInput := fmt.Sprintf("System context: %s\n\nUser request: %s", GetPlanningSystemPrompt(), userInput)
+
+	// Use agent.Chat which has access to tools including file reading
+	response, err := agent.Chat(ctx, contextualInput)
 	if err != nil {
-		return nil, fmt.Errorf("planning mode AI request failed: %w", err)
+		return "", fmt.Errorf("planning mode AI request failed: %w", err)
 	}
 
 	return response, nil

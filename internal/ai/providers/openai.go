@@ -174,6 +174,9 @@ func (p *OpenAIProvider) convertRequest(req *ai.ChatRequest) map[string]interfac
 		if msg.Name != "" {
 			m["name"] = msg.Name
 		}
+		if msg.ToolCallID != "" {
+			m["tool_call_id"] = msg.ToolCallID
+		}
 		if len(msg.ToolCalls) > 0 {
 			m["tool_calls"] = msg.ToolCalls
 		}
