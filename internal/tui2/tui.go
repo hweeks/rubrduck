@@ -1,6 +1,8 @@
 package tui2
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -9,6 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/hammie/rubrduck/internal/ai"
+	_ "github.com/hammie/rubrduck/internal/ai/providers" // Register AI providers
 	"github.com/hammie/rubrduck/internal/config"
 )
 
@@ -70,12 +74,21 @@ var modes = []ModeInfo{
 
 // Run starts the Bubble Tea program for the interactive TUI.
 func Run(cfg *config.Config) error {
+	// Initialize AI provider
+	provider, err := ai.GetProvider(cfg.Provider, map[string]interface{}{
+		"api_key":  cfg.Providers[cfg.Provider].APIKey,
+		"base_url": cfg.Providers[cfg.Provider].BaseURL,
+	})
+	if err != nil {
+		return err
+	}
+
 	p := tea.NewProgram(
-		newModel(),
+		newModel(cfg, provider),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
-	_, err := p.Run()
+	_, err = p.Run()
 	return err
 }
 
@@ -101,10 +114,14 @@ type model struct {
 	// Dimensions
 	width  int
 	height int
+
+	// AI integration
+	config   *config.Config
+	provider ai.Provider
 }
 
 // newModel initializes the TUI model with default components.
-func newModel() model {
+func newModel(cfg *config.Config, provider ai.Provider) model {
 	// Spinner for AI thinking indicator
 	s := spinner.New()
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -128,6 +145,8 @@ func newModel() model {
 		messages:       make([]message, 0),
 		loading:        false,
 		userScrolling:  false,
+		config:         cfg,
+		provider:       provider,
 	}
 }
 
@@ -158,11 +177,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case respondMsg:
 		m.loading = false
-		m.messages = append(m.messages, message{
-			sender: "ai",
-			text:   msg.response,
-			mode:   m.viewMode,
-		})
+		if msg.err != nil {
+			// Handle AI request errors
+			errorMsg := "❌ Error: " + msg.err.Error()
+			m.messages = append(m.messages, message{
+				sender: "ai",
+				text:   errorMsg,
+				mode:   m.viewMode,
+			})
+		} else {
+			m.messages = append(m.messages, message{
+				sender: "ai",
+				text:   msg.response,
+				mode:   m.viewMode,
+			})
+		}
 		// Render messages with new content
 		content := m.renderChatContent()
 		m.viewport.SetContent(content)
@@ -297,7 +326,7 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			return m, tea.Batch(
 				spinner.Tick,
-				waitForResponse(userText, m.viewMode),
+				makeAIRequest(userText, m.viewMode, m.provider, m.config.Model),
 			)
 		}
 	}
@@ -445,30 +474,56 @@ func (m model) renderChatContent() string {
 	return out
 }
 
-// respondMsg carries a simulated AI response.
+// respondMsg carries an AI response.
 type respondMsg struct {
 	response string
 	mode     ViewMode
+	err      error
 }
 
-// waitForResponse simulates generating an AI response after a short delay.
-func waitForResponse(input string, mode ViewMode) tea.Cmd {
-	return tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-		// Mode-specific response prefixes
-		var response string
+// makeAIRequest processes user input through the appropriate AI mode
+func makeAIRequest(input string, mode ViewMode, provider ai.Provider, model string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		var response *ai.ChatResponse
+		var err error
+
+		// Route to appropriate mode processor
 		switch mode {
 		case ViewModePlanning:
-			response = "📋 Planning Analysis: " + input + "\n\nBased on your request, here's a strategic approach..."
+			response, err = ProcessPlanningRequest(ctx, provider, input, model)
 		case ViewModeBuilding:
-			response = "🔨 Building Solution: " + input + "\n\nLet me help you implement this feature..."
+			response, err = ProcessBuildingRequest(ctx, provider, input, model)
 		case ViewModeDebugging:
-			response = "🐛 Debug Analysis: " + input + "\n\nI've identified the issue. Here's what's happening..."
+			response, err = ProcessDebuggingRequest(ctx, provider, input, model)
 		case ViewModeEnhance:
-			response = "🔧 Enhancement Plan: " + input + "\n\nHere are the improvements I recommend..."
+			response, err = ProcessEnhanceRequest(ctx, provider, input, model)
 		default:
-			response = "Echo: " + input
+			err = fmt.Errorf("unknown mode: %v", mode)
 		}
 
-		return respondMsg{response: response, mode: mode}
-	})
+		if err != nil {
+			return respondMsg{
+				response: "",
+				mode:     mode,
+				err:      err,
+			}
+		}
+
+		// Extract response content
+		var content string
+		if len(response.Choices) > 0 {
+			content = response.Choices[0].Message.Content
+		} else {
+			content = "No response generated."
+		}
+
+		return respondMsg{
+			response: content,
+			mode:     mode,
+			err:      nil,
+		}
+	}
 }
