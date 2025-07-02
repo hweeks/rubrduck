@@ -1,16 +1,15 @@
 package commands
 
 import (
-   "fmt"
-   "os"
-   "strings"
+	"fmt"
+	"os"
+	"strings"
 
-   "github.com/hammie/rubrduck/internal/config"
-   "github.com/hammie/rubrduck/internal/tui"
-   tui2 "github.com/hammie/rubrduck/internal/tui2"
-   "github.com/rs/zerolog/log"
-   "github.com/spf13/cobra"
-   "github.com/spf13/viper"
+	"github.com/hammie/rubrduck/internal/config"
+	tui2 "github.com/hammie/rubrduck/internal/tui2"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -19,26 +18,6 @@ var (
 	model        string
 	approvalMode string
 )
-
-// tuiSnapshotsCmd generates static text snapshots for each TUI mode
-var tuiSnapshotsCmd = &cobra.Command{
-	Use:   "tui-snapshots",
-	Short: "Generate static snapshots of all TUI modes",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load configuration: %w", err)
-		}
-		for _, mode := range tui.ModeOptions {
-			m := tui.NewModel(cfg)
-			m.SetMode(mode)
-			m.SetSize(80, 24)
-			m.SetFocused(true)
-			fmt.Printf("=== %s ===\n%s\n\n", tui.ModeName(mode), m.View())
-		}
-		return nil
-	},
-}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -75,17 +54,14 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&approvalMode, "approval-mode", "a", "suggest", "Approval mode: suggest, auto-edit, or full-auto")
 
 	// Bind flags to viper
-   _ = viper.BindPFlag("provider", rootCmd.PersistentFlags().Lookup("provider"))
-   _ = viper.BindPFlag("model", rootCmd.PersistentFlags().Lookup("model"))
-   _ = viper.BindPFlag("agent.approval_mode", rootCmd.PersistentFlags().Lookup("approval-mode"))
+	_ = viper.BindPFlag("provider", rootCmd.PersistentFlags().Lookup("provider"))
+	_ = viper.BindPFlag("model", rootCmd.PersistentFlags().Lookup("model"))
+	_ = viper.BindPFlag("agent.approval_mode", rootCmd.PersistentFlags().Lookup("approval-mode"))
 
 	// Add subcommands
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
-
-	// Generate static snapshots of the TUI modes
-	rootCmd.AddCommand(tuiSnapshotsCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -151,6 +127,6 @@ func runInteractiveTUI() error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-   // Start the interactive Bubble Tea–based TUI
-   return tui2.Run(cfg)
+	// Start the interactive Bubble Tea–based TUI
+	return tui2.Run(cfg)
 }
