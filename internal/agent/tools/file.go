@@ -39,7 +39,7 @@ func (f *FileTool) GetDefinition() ai.Tool {
 				"properties": map[string]interface{}{
 					"type": map[string]interface{}{
 						"type":        "string",
-						"enum":        []string{"read", "write", "list", "search"},
+						"enum":        []string{"read", "write", "list", "search", "append"},
 						"description": "The type of file operation to perform",
 					},
 					"path": map[string]interface{}{
@@ -96,6 +96,8 @@ func (f *FileTool) Execute(ctx context.Context, args string) (string, error) {
 		return f.readFile(fullPath)
 	case "write":
 		return f.writeFile(fullPath, params.Content)
+	case "append":
+		return f.appendFile(fullPath, params.Content)
 	case "list":
 		return f.listDirectory(fullPath, params.MaxResults)
 	case "search":
@@ -223,6 +225,64 @@ func (f *FileTool) writeFile(path, content string) (string, error) {
 	}
 
 	return fmt.Sprintf("Successfully wrote %d bytes to %s (took %v)", len(content), path, duration), nil
+}
+
+// appendFile appends content to a file
+func (f *FileTool) appendFile(path, content string) (string, error) {
+	log.Debug().
+		Str("path", path).
+		Int("content_size", len(content)).
+		Msg("Appending to file")
+
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Check if file exists and is read-only
+	if _, err := os.Stat(path); err == nil {
+		// File exists, check if it's read-only
+		info, err := os.Stat(path)
+		if err == nil && info.Mode()&0200 == 0 {
+			return "", fmt.Errorf("file is read-only")
+		}
+	}
+
+	// Open file in append mode
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file for append: %w", err)
+	}
+	defer file.Close()
+
+	// Append content
+	startTime := time.Now()
+	if _, err := file.WriteString(content); err != nil {
+		return "", fmt.Errorf("failed to append to file: %w", err)
+	}
+	duration := time.Since(startTime)
+
+	// Use same thresholds as writeFile
+	const largeFileThreshold = 50 * 1024 // 50KB
+
+	// Log completion with timing for large files
+	if len(content) > largeFileThreshold {
+		log.Info().
+			Str("path", path).
+			Int("size_bytes", len(content)).
+			Dur("duration", duration).
+			Float64("kb_per_second", float64(len(content))/1024/duration.Seconds()).
+			Msg("Large file append completed")
+	}
+
+	// Provide detailed feedback including write speed for large files
+	if len(content) > largeFileThreshold {
+		return fmt.Sprintf("Successfully appended %d KB to %s (took %v, %.1f KB/s)",
+			len(content)/1024, path, duration, float64(len(content))/1024/duration.Seconds()), nil
+	}
+
+	return fmt.Sprintf("Successfully appended %d bytes to %s (took %v)", len(content), path, duration), nil
 }
 
 // listDirectory lists the contents of a directory

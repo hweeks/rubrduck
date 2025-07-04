@@ -147,7 +147,7 @@ func (s *ShellTool) validateCommand(command string) error {
 	// Check if command contains dangerous patterns
 	dangerousPatterns := []string{
 		"&&", "||", ";", "|", ">", "<", ">>", "<<", "2>", "&>",
-		"$((", "`", "eval", "exec", "source", ".",
+		"$((", "`", "eval", "exec", "source",
 	}
 
 	for _, pattern := range dangerousPatterns {
