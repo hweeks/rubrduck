@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/hammie/rubrduck/internal/ai"
 	"github.com/rs/zerolog/log"
@@ -154,7 +155,34 @@ func (f *FileTool) readFile(path string) (string, error) {
 
 // writeFile writes content to a file
 func (f *FileTool) writeFile(path, content string) (string, error) {
-	log.Debug().Str("path", path).Msg("Writing file")
+	log.Debug().
+		Str("path", path).
+		Int("content_size", len(content)).
+		Msg("Writing file")
+
+	// Check for very large files that might cause streaming timeouts
+	const largeFileThreshold = 50 * 1024      // 50KB
+	const veryLargeFileThreshold = 200 * 1024 // 200KB
+
+	if len(content) > veryLargeFileThreshold {
+		log.Error().
+			Str("path", path).
+			Int("size_bytes", len(content)).
+			Int("size_kb", len(content)/1024).
+			Msg("File content is extremely large - this may cause timeout issues during streaming")
+
+		// For very large files, suggest using incremental updates
+		return "", fmt.Errorf("file content is too large (%d KB) for a single write operation. Consider breaking this into smaller incremental updates or using append operations", len(content)/1024)
+	}
+
+	// Log warning for large files
+	if len(content) > largeFileThreshold {
+		log.Warn().
+			Str("path", path).
+			Int("size_bytes", len(content)).
+			Int("size_kb", len(content)/1024).
+			Msg("Writing large file - this may take time")
+	}
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(path)
@@ -171,11 +199,30 @@ func (f *FileTool) writeFile(path, content string) (string, error) {
 		}
 	}
 
+	// Write file with progress tracking for large files
+	startTime := time.Now()
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}
+	duration := time.Since(startTime)
 
-	return fmt.Sprintf("Successfully wrote %d bytes to %s", len(content), path), nil
+	// Log completion with timing for large files
+	if len(content) > largeFileThreshold {
+		log.Info().
+			Str("path", path).
+			Int("size_bytes", len(content)).
+			Dur("duration", duration).
+			Float64("kb_per_second", float64(len(content))/1024/duration.Seconds()).
+			Msg("Large file write completed")
+	}
+
+	// Provide detailed feedback including write speed for large files
+	if len(content) > largeFileThreshold {
+		return fmt.Sprintf("Successfully wrote %d KB to %s (took %v, %.1f KB/s)",
+			len(content)/1024, path, duration, float64(len(content))/1024/duration.Seconds()), nil
+	}
+
+	return fmt.Sprintf("Successfully wrote %d bytes to %s (took %v)", len(content), path, duration), nil
 }
 
 // listDirectory lists the contents of a directory

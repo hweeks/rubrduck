@@ -84,9 +84,40 @@ lint:
 	exit 1; \
 	fi
 
+# Run CLI directly (no build step)
 cli-run:
-	@echo "Running CLI..."
-	go run cmd/rubrduck/main.go
+	@echo "Running CLI with debug logging..."
+	DEBUG=true go run cmd/rubrduck/main.go
+
+# Run CLI with debug logging and capture output
+cli-debug:
+	@echo "Running CLI with debug logging and capturing to debug.log..."
+	DEBUG=true go run cmd/rubrduck/main.go 2>&1 | tee debug.log
+
+# Test tool calls with logging
+test-tool-calls:
+	@echo "Testing tool calls with debug logging..."
+	@echo "what is in the next_steps.md file" | DEBUG=true go run cmd/rubrduck/main.go 2>&1 | tee tool-test.log
+
+# Test streaming with a complex query
+test-streaming:
+	@echo "Testing streaming with complex query..."
+	@echo "list all go files in this project and tell me about the main function" | DEBUG=true go run cmd/rubrduck/main.go 2>&1 | tee stream-test.log
+
+# Watch log file in real time (run in separate terminal)
+watch-logs:
+	@echo "Watching rubrduck log file..."
+	@if [ -f ~/.rubrduck/rubrduck.log ]; then \
+		tail -f ~/.rubrduck/rubrduck.log; \
+	else \
+		echo "Log file not found. Run the app first to create it."; \
+	fi
+
+# Clear logs
+clear-logs:
+	@echo "Clearing log files..."
+	@rm -f ~/.rubrduck/rubrduck.log debug.log tool-test.log stream-test.log
+	@echo "Logs cleared"
 
 # Download dependencies
 deps:
@@ -109,15 +140,21 @@ build-all:
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  make build         - Build the binary"
-	@echo "  make run          - Build and run the application"
-	@echo "  make dev          - Run with hot reload (requires air)"
-	@echo "  make test         - Run tests"
-	@echo "  make test-coverage - Run tests with coverage report"
-	@echo "  make clean        - Clean build artifacts"
-	@echo "  make install      - Install the binary"
-	@echo "  make fmt          - Format code"
-	@echo "  make lint         - Run linters"
-	@echo "  make deps         - Download dependencies"
-	@echo "  make build-all    - Build for multiple platforms"
-	@echo "  make help         - Show this help message" 
+	@echo "  make build            - Build the binary"
+	@echo "  make run             - Build and run the application"
+	@echo "  make dev             - Run with hot reload (requires air)"
+	@echo "  make cli-run         - Run CLI directly with debug logging"
+	@echo "  make cli-debug       - Run CLI with debug logging and capture to debug.log"
+	@echo "  make test-tool-calls - Test tool call functionality with logging"
+	@echo "  make test-streaming  - Test streaming with complex query"
+	@echo "  make watch-logs      - Watch log file in real time"
+	@echo "  make clear-logs      - Clear all log files"
+	@echo "  make test            - Run tests"
+	@echo "  make test-coverage   - Run tests with coverage report"
+	@echo "  make clean           - Clean build artifacts"
+	@echo "  make install         - Install the binary"
+	@echo "  make fmt             - Format code"
+	@echo "  make lint            - Run linters"
+	@echo "  make deps            - Download dependencies"
+	@echo "  make build-all       - Build for multiple platforms"
+	@echo "  make help            - Show this help message" 

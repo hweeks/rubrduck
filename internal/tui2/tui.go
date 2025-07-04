@@ -110,6 +110,7 @@ type model struct {
 	streaming      bool
 	partial        string
 	streamCh       <-chan agent.StreamEvent
+	streamChunks   int // Track number of chunks received
 
 	// Dimensions
 	width  int
@@ -148,6 +149,7 @@ func newModel(cfg *config.Config, agent *agent.Agent) model {
 		streaming:      false,
 		partial:        "",
 		streamCh:       nil,
+		streamChunks:   0,
 		config:         cfg,
 		agent:          agent,
 	}
@@ -181,19 +183,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case streamMsg:
 		switch msg.event.Type {
 		case agent.EventTokenChunk:
+			m.streamChunks++
 			m.partial += msg.event.Token
-			content := m.renderChatContent() + lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true).Render("AI:    ") + m.partial
+
+			// Show progress for large operations
+			progressIndicator := ""
+			if m.streamChunks > 100 {
+				progressIndicator = fmt.Sprintf(" [%d chunks received]", m.streamChunks)
+			}
+
+			content := m.renderChatContent() + lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true).Render("AI:    ") + m.partial + progressIndicator
 			m.viewport.SetContent(content)
 			if !m.userScrolling {
 				m.viewport.GotoBottom()
 			}
+			if msg.cancel != nil {
+				return m, listenStreamWithCancel(msg.ch, msg.cancel)
+			}
 			return m, listenStream(msg.ch)
 		case agent.EventToolResult:
+			m.streamChunks++
 			m.partial += "\n" + msg.event.Result
-			content := m.renderChatContent() + lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true).Render("AI:    ") + m.partial
+
+			// Show progress for large operations
+			progressIndicator := ""
+			if m.streamChunks > 100 {
+				progressIndicator = fmt.Sprintf(" [%d chunks received]", m.streamChunks)
+			}
+
+			content := m.renderChatContent() + lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true).Render("AI:    ") + m.partial + progressIndicator
 			m.viewport.SetContent(content)
 			if !m.userScrolling {
 				m.viewport.GotoBottom()
+			}
+			if msg.cancel != nil {
+				return m, listenStreamWithCancel(msg.ch, msg.cancel)
 			}
 			return m, listenStream(msg.ch)
 		case agent.EventDone:
@@ -201,13 +225,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.streaming = false
 			m.messages = append(m.messages, message{sender: "ai", text: m.partial, mode: m.viewMode})
 			m.partial = ""
+			m.streamChunks = 0 // Reset chunk counter
 			content := m.renderChatContent()
 			m.viewport.SetContent(content)
 			if !m.userScrolling {
 				m.viewport.GotoBottom()
 			}
+			// Context should already be canceled by listenStreamWithCancel
 			return m, nil
 		default:
+			if msg.cancel != nil {
+				return m, listenStreamWithCancel(msg.ch, msg.cancel)
+			}
 			return m, listenStream(msg.ch)
 		}
 
@@ -361,7 +390,8 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.input.Reset()
 			m.loading = true
 			m.streaming = true
-			cmd := makeAIRequest(userText, m.viewMode, m.agent, m.config.Model)
+			m.streamChunks = 0 // Reset chunk counter for new stream
+			cmd := makeAIRequest(userText, m.viewMode, m.agent, m.config)
 			return m, tea.Batch(spinner.Tick, cmd)
 		}
 	}
@@ -439,7 +469,11 @@ func (m model) renderChatMode() string {
 	var inputView string
 	if m.loading {
 		// Show spinner with input field when AI is thinking
-		spinner := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(m.spinner.View() + " AI thinking... ")
+		spinnerText := " AI thinking... "
+		if m.streamChunks > 0 {
+			spinnerText = fmt.Sprintf(" AI processing... [%d chunks] ", m.streamChunks)
+		}
+		spinner := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(m.spinner.View() + spinnerText)
 		inputView = lipgloss.JoinHorizontal(lipgloss.Left, spinner, m.input.View())
 	} else {
 		inputView = m.input.View()
@@ -456,9 +490,22 @@ func (m model) renderChatMode() string {
 		}
 	}
 
+	// Get timeout for current mode
+	var timeout int
+	switch m.viewMode {
+	case ViewModePlanning:
+		timeout = m.config.TUI.PlanningTimeout
+	case ViewModeBuilding:
+		timeout = m.config.TUI.BuildingTimeout
+	case ViewModeDebugging:
+		timeout = m.config.TUI.DebugTimeout
+	case ViewModeEnhance:
+		timeout = m.config.TUI.EnhanceTimeout
+	}
+
 	header := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("205")).
-		Render(currentMode.Icon + " " + currentMode.Name + " Mode (ESC to return to mode selection)")
+		Render(fmt.Sprintf("%s %s Mode (timeout: %ds) - ESC to return", currentMode.Icon, currentMode.Name, timeout))
 
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
@@ -517,41 +564,76 @@ type respondMsg struct {
 }
 
 type streamMsg struct {
-	event agent.StreamEvent
-	ch    <-chan agent.StreamEvent
+	event  agent.StreamEvent
+	ch     <-chan agent.StreamEvent
+	cancel context.CancelFunc
 }
 
 // makeAIRequest processes user input through the agent with tools
-func makeAIRequest(input string, mode ViewMode, ag *agent.Agent, model string) tea.Cmd {
+func makeAIRequest(input string, mode ViewMode, ag *agent.Agent, cfg *config.Config) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
+		// Get timeout from config based on mode
+		var timeout time.Duration
+
+		switch mode {
+		case ViewModePlanning:
+			if cfg.TUI.PlanningTimeout > 0 {
+				timeout = time.Duration(cfg.TUI.PlanningTimeout) * time.Second
+			} else {
+				timeout = time.Duration(cfg.Agent.Timeout) * time.Second
+			}
+		case ViewModeBuilding:
+			if cfg.TUI.BuildingTimeout > 0 {
+				timeout = time.Duration(cfg.TUI.BuildingTimeout) * time.Second
+			} else {
+				timeout = time.Duration(cfg.Agent.Timeout) * time.Second
+			}
+		case ViewModeDebugging:
+			if cfg.TUI.DebugTimeout > 0 {
+				timeout = time.Duration(cfg.TUI.DebugTimeout) * time.Second
+			} else {
+				timeout = time.Duration(cfg.Agent.Timeout) * time.Second
+			}
+		case ViewModeEnhance:
+			if cfg.TUI.EnhanceTimeout > 0 {
+				timeout = time.Duration(cfg.TUI.EnhanceTimeout) * time.Second
+			} else {
+				timeout = time.Duration(cfg.Agent.Timeout) * time.Second
+			}
+		default:
+			timeout = time.Duration(cfg.Agent.Timeout) * time.Second
+		}
+
+		// Create a context with appropriate timeout
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
 		var ch <-chan agent.StreamEvent
 		var err error
 
 		switch mode {
 		case ViewModePlanning:
-			ch, err = ProcessPlanningRequest(ctx, ag, input, model)
+			ch, err = ProcessPlanningRequest(ctx, ag, input, cfg.Model)
 		case ViewModeBuilding:
-			ch, err = ProcessBuildingRequest(ctx, ag, input, model)
+			ch, err = ProcessBuildingRequest(ctx, ag, input, cfg.Model)
 		case ViewModeDebugging:
-			ch, err = ProcessDebuggingRequest(ctx, ag, input, model)
+			ch, err = ProcessDebuggingRequest(ctx, ag, input, cfg.Model)
 		case ViewModeEnhance:
-			ch, err = ProcessEnhanceRequest(ctx, ag, input, model)
+			ch, err = ProcessEnhanceRequest(ctx, ag, input, cfg.Model)
 		default:
 			err = fmt.Errorf("unknown mode: %v", mode)
 		}
 
 		if err != nil {
+			cancel() // Cancel on error
 			return respondMsg{response: "", mode: mode, err: err}
 		}
 
 		ev, ok := <-ch
 		if !ok {
+			cancel() // Cancel when stream ends
 			return respondMsg{response: "", mode: mode, err: nil}
 		}
-		return streamMsg{event: ev, ch: ch}
+		return streamMsg{event: ev, ch: ch, cancel: cancel}
 	}
 }
 
@@ -562,5 +644,18 @@ func listenStream(ch <-chan agent.StreamEvent) tea.Cmd {
 			return streamMsg{event: agent.StreamEvent{Type: agent.EventDone}, ch: nil}
 		}
 		return streamMsg{event: ev, ch: ch}
+	}
+}
+
+func listenStreamWithCancel(ch <-chan agent.StreamEvent, cancel context.CancelFunc) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-ch
+		if !ok {
+			if cancel != nil {
+				cancel() // Cancel context when stream ends
+			}
+			return streamMsg{event: agent.StreamEvent{Type: agent.EventDone}, ch: nil}
+		}
+		return streamMsg{event: ev, ch: ch, cancel: cancel}
 	}
 }

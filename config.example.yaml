@@ -49,7 +49,9 @@ agent:
   # Maximum retries for failed operations
   max_retries: 3
 
-  # Timeout for operations (in seconds)
+  # General timeout for operations (in seconds)
+  # This is used as the default timeout for all operations
+  # Can be overridden by mode-specific timeouts in the TUI section
   timeout: 300
 
   # Working directory (defaults to current directory)
@@ -96,6 +98,110 @@ tui:
 
   # Syntax highlighting style
   syntax_theme: monokai
+
+  # Initial mode when starting the TUI (planning, building, debugging, enhance)
+  # Leave empty to show mode selection
+  start_mode: ""
+
+  # Timeouts for different modes (in seconds)
+  # These control how long operations can run before timing out
+  planning_timeout: 300 # 5 minutes - planning often involves large file writes
+  building_timeout: 180 # 3 minutes - building may involve code generation
+  debug_timeout: 120 # 2 minutes - debugging is usually faster
+  enhance_timeout: 120 # 2 minutes - enhancements are typically smaller
+
+# Sandbox Policy Configuration
+sandbox:
+  # Paths that tools can read from
+  allow_read_paths:
+    - "./"
+    - "~/.rubrduck"
+
+  # Paths that tools can write to
+  allow_write_paths:
+    - "./"
+
+  # Paths that are completely blocked
+  block_paths:
+    - "/etc"
+    - "/var"
+    - "/usr"
+    - "/bin"
+    - "/sbin"
+    - "/System"
+
+  # Allow network access
+  allow_network: false
+
+  # Allowed network hosts (if network is enabled)
+  allowed_hosts: []
+
+  # Resource limits
+  max_processes: 10
+  max_memory_mb: 512
+  max_cpu_time: 30 # seconds
+
+  # Commands that are allowed to run
+  allowed_commands:
+    - ls
+    - cat
+    - head
+    - tail
+    - grep
+    - find
+    - wc
+    - sort
+    - uniq
+    - echo
+    - pwd
+    - whoami
+    - date
+    - ps
+    - git
+    - go
+    - npm
+    - yarn
+    - python
+    - node
+    - make
+
+  # Commands that are explicitly blocked
+  blocked_commands:
+    - rm
+    - rmdir
+    - del
+    - format
+    - mkfs
+    - dd
+    - shred
+    - sudo
+    - su
+    - chmod
+    - chown
+    - passwd
+    - useradd
+    - wget
+    - curl
+    - nc
+    - netcat
+    - ssh
+    - scp
+    - rsync
+
+  # Environment variables that can be accessed
+  allowed_env_vars:
+    - PATH
+    - HOME
+    - USER
+    - PWD
+    - LANG
+    - LC_ALL
+
+  # Environment variables that are blocked
+  blocked_env_vars:
+    - SUDO_ASKPASS
+    - SSH_AUTH_SOCK
+    - GPG_AGENT_INFO
 
 # Logging Configuration
 logging:

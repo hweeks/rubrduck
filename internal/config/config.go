@@ -34,7 +34,8 @@ type Config struct {
 	History   HistoryConfig       `mapstructure:"history"`
 	Sandbox   SandboxPolicy       `mapstructure:"sandbox"`
 	// TUI holds configuration for the terminal user interface
-	TUI TUIConfig `mapstructure:"tui"`
+	TUI     TUIConfig     `mapstructure:"tui"`
+	Logging LoggingConfig `mapstructure:"logging"`
 }
 
 // TUIConfig holds settings for the terminal UI modes
@@ -42,6 +43,12 @@ type TUIConfig struct {
 	// StartMode sets the initial UI mode ("planning", "building", "debugging", "enhance").
 	// If empty or unrecognized, the UI will prompt to select a mode.
 	StartMode string `mapstructure:"start_mode"`
+
+	// Timeouts for different modes (in seconds)
+	PlanningTimeout int `mapstructure:"planning_timeout"`
+	BuildingTimeout int `mapstructure:"building_timeout"`
+	DebugTimeout    int `mapstructure:"debug_timeout"`
+	EnhanceTimeout  int `mapstructure:"enhance_timeout"`
 }
 
 // Provider represents an AI provider configuration
@@ -57,6 +64,7 @@ type AgentConfig struct {
 	ApprovalMode   string `mapstructure:"approval_mode"`
 	SandboxEnabled bool   `mapstructure:"sandbox_enabled"`
 	MaxRetries     int    `mapstructure:"max_retries"`
+	Timeout        int    `mapstructure:"timeout"` // General timeout in seconds
 }
 
 // APIConfig represents API server settings
@@ -72,6 +80,14 @@ type HistoryConfig struct {
 	MaxSize           int      `mapstructure:"max_size"`
 	SaveHistory       bool     `mapstructure:"save_history"`
 	SensitivePatterns []string `mapstructure:"sensitive_patterns"`
+}
+
+// LoggingConfig represents logging configuration
+type LoggingConfig struct {
+	Level      string `mapstructure:"level"`
+	File       string `mapstructure:"file"`
+	MaxSize    int    `mapstructure:"max_size"`
+	MaxBackups int    `mapstructure:"max_backups"`
 }
 
 // Load loads the configuration from viper
@@ -124,6 +140,7 @@ func setDefaults() {
 	viper.SetDefault("agent.approval_mode", "suggest")
 	viper.SetDefault("agent.sandbox_enabled", true)
 	viper.SetDefault("agent.max_retries", 3)
+	viper.SetDefault("agent.timeout", 300) // 5 minutes default
 
 	// API defaults
 	viper.SetDefault("api.enabled", false)
@@ -158,6 +175,16 @@ func setDefaults() {
 
 	// TUI defaults
 	viper.SetDefault("tui.start_mode", "")
+	viper.SetDefault("tui.planning_timeout", 300) // 5 minutes for planning
+	viper.SetDefault("tui.building_timeout", 180) // 3 minutes for building
+	viper.SetDefault("tui.debug_timeout", 120)    // 2 minutes for debugging
+	viper.SetDefault("tui.enhance_timeout", 120)  // 2 minutes for enhance
+
+	// Logging defaults
+	viper.SetDefault("logging.level", "info")
+	viper.SetDefault("logging.file", "")
+	viper.SetDefault("logging.max_size", 10)
+	viper.SetDefault("logging.max_backups", 3)
 }
 
 // Validate validates the configuration

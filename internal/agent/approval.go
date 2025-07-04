@@ -207,6 +207,16 @@ func (a *ApprovalSystem) RequestBatchApproval(ctx context.Context, requests []Ap
 
 // analyzeOperation analyzes a tool operation to determine type, risk, and generate preview
 func (a *ApprovalSystem) analyzeOperation(tool, args string) (opType string, risk RiskLevel, preview string, err error) {
+	// Validate arguments are not empty
+	if args == "" {
+		return "invalid", RiskHigh, "Empty arguments", fmt.Errorf("empty arguments for tool %s", tool)
+	}
+
+	// Basic JSON validation
+	if !json.Valid([]byte(args)) {
+		return "invalid", RiskHigh, "Invalid JSON arguments", fmt.Errorf("invalid JSON arguments for tool %s: %s", tool, args)
+	}
+
 	switch tool {
 	case "file_operations":
 		return a.analyzeFileOperation(args)
@@ -228,7 +238,12 @@ func (a *ApprovalSystem) analyzeFileOperation(args string) (opType string, risk 
 	}
 
 	if err := json.Unmarshal([]byte(args), &params); err != nil {
-		return "", RiskHigh, "", err
+		return "file_invalid", RiskHigh, fmt.Sprintf("Invalid file operation arguments: %s", args), fmt.Errorf("failed to parse file operation args: %w", err)
+	}
+
+	// Validate required fields
+	if params.Type == "" {
+		return "file_invalid", RiskHigh, "Missing operation type", fmt.Errorf("missing type in file operation")
 	}
 
 	switch params.Type {
@@ -254,7 +269,12 @@ func (a *ApprovalSystem) analyzeShellOperation(args string) (opType string, risk
 	}
 
 	if err := json.Unmarshal([]byte(args), &params); err != nil {
-		return "", RiskHigh, "", err
+		return "shell_invalid", RiskHigh, fmt.Sprintf("Invalid shell operation arguments: %s", args), fmt.Errorf("failed to parse shell operation args: %w", err)
+	}
+
+	// Validate required fields
+	if params.Command == "" {
+		return "shell_invalid", RiskHigh, "Missing command", fmt.Errorf("missing command in shell operation")
 	}
 
 	risk = a.assessShellCommandRisk(params.Command)
