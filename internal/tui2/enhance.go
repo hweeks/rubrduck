@@ -3,8 +3,6 @@ package tui2
 import (
 	"context"
 	"fmt"
-
-	"github.com/hammie/rubrduck/internal/agent"
 )
 
 // GetEnhanceSystemPrompt returns the system prompt for enhancement mode
@@ -23,12 +21,24 @@ func GetEnhanceSystemPrompt() (string, error) {
 }
 
 // ProcessEnhanceRequest handles AI requests for enhancement mode using the agent
-func ProcessEnhanceRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (<-chan agent.StreamEvent, error) {
+func ProcessEnhanceRequest(ctx context.Context, agent AgentInterface, userInput, model string) (string, error) {
+	// Clear agent history and set system context
+	agent.ClearHistory()
+
+	// Get system prompt
 	systemPrompt, err := GetEnhanceSystemPrompt()
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to get enhance system prompt: %w", err)
 	}
 
+	// Create a combined input with system context
 	contextualInput := fmt.Sprintf("System context: %s\n\nUser request: %s", systemPrompt, userInput)
-	return agent.StreamEvents(ctx, contextualInput)
+
+	// Use agent.Chat which has access to tools including file reading
+	response, err := agent.Chat(ctx, contextualInput)
+	if err != nil {
+		return "", err
+	}
+
+	return response, nil
 }

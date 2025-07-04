@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hammie/rubrduck/internal/agent"
 	"github.com/hammie/rubrduck/pkg/plans"
 )
 
@@ -47,10 +46,14 @@ func GetPlanningSystemPrompt() (string, error) {
 }
 
 // ProcessPlanningRequest handles AI requests for planning mode using the agent
-func ProcessPlanningRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (<-chan agent.StreamEvent, error) {
+func ProcessPlanningRequest(ctx context.Context, agent AgentInterface, userInput, model string) (string, error) {
+	// Clear agent history and set system context
+	agent.ClearHistory()
+
+	// Get system prompt
 	systemPrompt, err := GetPlanningSystemPrompt()
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to get planning system prompt: %w", err)
 	}
 
 	// Get plan context
@@ -74,7 +77,13 @@ func ProcessPlanningRequest(ctx context.Context, agent *agent.Agent, userInput, 
 		contextualInput = fmt.Sprintf("System context: %s\n\nUser request: %s", systemPrompt, userInput)
 	}
 
-	return agent.StreamEvents(ctx, contextualInput)
+	// Use agent.Chat which has access to tools including file reading
+	response, err := agent.Chat(ctx, contextualInput)
+	if err != nil {
+		return "", err
+	}
+
+	return response, nil
 }
 
 // getPlanningContext retrieves relevant plan context for planning mode

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hammie/rubrduck/internal/agent"
 	"github.com/hammie/rubrduck/pkg/plans"
 )
 
@@ -24,10 +23,14 @@ func GetBuildingSystemPrompt() (string, error) {
 }
 
 // ProcessBuildingRequest handles AI requests for building mode using the agent
-func ProcessBuildingRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (<-chan agent.StreamEvent, error) {
+func ProcessBuildingRequest(ctx context.Context, agent AgentInterface, userInput, model string) (string, error) {
+	// Clear agent history and set system context
+	agent.ClearHistory()
+
+	// Get system prompt
 	systemPrompt, err := GetBuildingSystemPrompt()
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to get building system prompt: %w", err)
 	}
 
 	// Get planning context for building mode
@@ -51,7 +54,13 @@ func ProcessBuildingRequest(ctx context.Context, agent *agent.Agent, userInput, 
 		contextualInput = fmt.Sprintf("System context: %s\n\nUser request: %s", systemPrompt, userInput)
 	}
 
-	return agent.StreamEvents(ctx, contextualInput)
+	// Use agent.Chat which has access to tools including file reading
+	response, err := agent.Chat(ctx, contextualInput)
+	if err != nil {
+		return "", err
+	}
+
+	return response, nil
 }
 
 // getBuildingContext retrieves relevant plan context for building mode

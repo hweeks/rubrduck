@@ -17,6 +17,12 @@ import (
 	"github.com/hammie/rubrduck/internal/config"
 )
 
+// AgentInterface defines the interface for AI agents
+type AgentInterface interface {
+	Chat(ctx context.Context, message string) (string, error)
+	ClearHistory()
+}
+
 // ViewMode represents the different TUI modes
 type ViewMode int
 
@@ -155,7 +161,7 @@ type model struct {
 
 	// AI integration
 	config *config.Config
-	agent  *agent.Agent
+	agent  AgentInterface
 }
 
 // approvalResponse carries the user's approval decision
@@ -165,7 +171,7 @@ type approvalResponse struct {
 }
 
 // newModel initializes the TUI model with default components.
-func newModel(cfg *config.Config, agent *agent.Agent) model {
+func newModel(cfg *config.Config, agent AgentInterface) model {
 	// Spinner for AI thinking indicator
 	s := spinner.New()
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -590,7 +596,7 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			m.streaming = true
 			m.streamChunks = 0 // Reset chunk counter for new stream
-			cmd := makeAIRequest(userText, m.viewMode, m.agent, m.config)
+			cmd := makeAIRequest(userText, m.viewMode, m.agent, m.config.Model)
 			return m, tea.Batch(spinner.Tick, cmd)
 		}
 	}
@@ -880,70 +886,21 @@ type streamMsg struct {
 }
 
 // makeAIRequest processes user input through the agent with tools
-func makeAIRequest(input string, mode ViewMode, ag *agent.Agent, cfg *config.Config) tea.Cmd {
+func makeAIRequest(input string, mode ViewMode, agent AgentInterface, model string) tea.Cmd {
 	return func() tea.Msg {
-		// Get timeout from config based on mode
-		var timeout time.Duration
+		// Create a context with timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
-		switch mode {
-		case ViewModePlanning:
-			if cfg.TUI.PlanningTimeout > 0 {
-				timeout = time.Duration(cfg.TUI.PlanningTimeout) * time.Second
-			} else {
-				timeout = time.Duration(cfg.Agent.Timeout) * time.Second
-			}
-		case ViewModeBuilding:
-			if cfg.TUI.BuildingTimeout > 0 {
-				timeout = time.Duration(cfg.TUI.BuildingTimeout) * time.Second
-			} else {
-				timeout = time.Duration(cfg.Agent.Timeout) * time.Second
-			}
-		case ViewModeDebugging:
-			if cfg.TUI.DebugTimeout > 0 {
-				timeout = time.Duration(cfg.TUI.DebugTimeout) * time.Second
-			} else {
-				timeout = time.Duration(cfg.Agent.Timeout) * time.Second
-			}
-		case ViewModeEnhance:
-			if cfg.TUI.EnhanceTimeout > 0 {
-				timeout = time.Duration(cfg.TUI.EnhanceTimeout) * time.Second
-			} else {
-				timeout = time.Duration(cfg.Agent.Timeout) * time.Second
-			}
-		default:
-			timeout = time.Duration(cfg.Agent.Timeout) * time.Second
-		}
-
-		// Create a context with appropriate timeout
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-
-		var ch <-chan agent.StreamEvent
-		var err error
-
-		switch mode {
-		case ViewModePlanning:
-			ch, err = ProcessPlanningRequest(ctx, ag, input, cfg.Model)
-		case ViewModeBuilding:
-			ch, err = ProcessBuildingRequest(ctx, ag, input, cfg.Model)
-		case ViewModeDebugging:
-			ch, err = ProcessDebuggingRequest(ctx, ag, input, cfg.Model)
-		case ViewModeEnhance:
-			ch, err = ProcessEnhanceRequest(ctx, ag, input, cfg.Model)
-		default:
-			err = fmt.Errorf("unknown mode: %v", mode)
-		}
+		// Use the agent interface to make the request
+		response, err := agent.Chat(ctx, input)
 
 		if err != nil {
-			cancel() // Cancel on error
+			cancel()
 			return respondMsg{response: "", mode: mode, err: err}
 		}
 
-		ev, ok := <-ch
-		if !ok {
-			cancel() // Cancel when stream ends
-			return respondMsg{response: "", mode: mode, err: nil}
-		}
-		return streamMsg{event: ev, ch: ch, cancel: cancel}
+		cancel()
+		return respondMsg{response: response, mode: mode, err: nil}
 	}
 }
 

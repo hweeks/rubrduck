@@ -1,0 +1,13 @@
+# Test golden files should not be treated as text files
+# This prevents git from changing line endings
+*.golden -text
+
+# Markdown files should use consistent line endings
+*.md text eol=lf
+
+# Go files should use consistent line endings  
+*.go text eol=lf
+
+# YAML files should use consistent line endings
+*.yaml text eol=lf
+*.yml text eol=lf

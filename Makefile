@@ -137,24 +137,97 @@ build-all:
 	GOOS=windows GOARCH=amd64 go build ${LDFLAGS} -o ${BUILD_DIR}/${BINARY_NAME}-windows-amd64.exe ${MAIN_PATH}
 	@echo "Multi-platform build complete"
 
+# TUI testing targets
+test-tui:
+	@echo "Running TUI tests..."
+	go test -v ./internal/tui2/...
+
+test-tui-coverage:
+	@echo "Running TUI tests with coverage..."
+	go test -v -coverprofile=tui-coverage.out ./internal/tui2/...
+	go tool cover -html=tui-coverage.out -o tui-coverage.html
+	@echo "TUI coverage report generated: tui-coverage.html"
+
+test-update:
+	@echo "Updating golden files..."
+	go test -update ./internal/tui2/...
+
+test-ci:
+	@echo "Running tests in CI mode..."
+	go test -v -race ./...
+
+test-tui-ci:
+	@echo "Running TUI tests in CI mode..."
+	go test -v -race ./internal/tui2/...
+
+test-performance:
+	@echo "Running TUI performance tests..."
+	go test -v -run TestPerformance ./internal/tui2/...
+
+test-scenarios:
+	@echo "Running predefined test scenarios..."
+	go test -v -run "TestPredefinedScenarios" ./internal/tui2/...
+
+test-workflows:
+	@echo "Running workflow tests..."
+	go test -v -run "TestWorkflow" ./internal/tui2/...
+
+tdd:
+	@echo "Starting TDD workflow..."
+	@if [ -z "$(TEST)" ]; then \
+		echo "Error: TEST variable not set. Use: make tdd TEST=TestName"; \
+		exit 1; \
+	fi
+	@echo "Running test: $(TEST)"
+	@go test -v -run $(TEST) ./internal/tui2/...
+
+test-failing:
+	@echo "Running tests that are expected to fail..."
+	@go test -v -run "TestTUIFeatureNotImplemented" ./internal/tui2/... || echo "Tests failed as expected"
+
+deps-test:
+	@echo "Installing testing dependencies..."
+	go get github.com/charmbracelet/x/exp/teatest@latest
+	go get github.com/stretchr/testify@latest
+
+test-clean:
+	@echo "Cleaning test artifacts..."
+	@rm -f tui-coverage.out tui-coverage.html
+	@find . -name "*.test" -delete 2>/dev/null || true
+
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  make build            - Build the binary"
-	@echo "  make run             - Build and run the application"
-	@echo "  make dev             - Run with hot reload (requires air)"
-	@echo "  make cli-run         - Run CLI directly with debug logging"
-	@echo "  make cli-debug       - Run CLI with debug logging and capture to debug.log"
-	@echo "  make test-tool-calls - Test tool call functionality with logging"
-	@echo "  make test-streaming  - Test streaming with complex query"
-	@echo "  make watch-logs      - Watch log file in real time"
-	@echo "  make clear-logs      - Clear all log files"
-	@echo "  make test            - Run tests"
-	@echo "  make test-coverage   - Run tests with coverage report"
-	@echo "  make clean           - Clean build artifacts"
-	@echo "  make install         - Install the binary"
-	@echo "  make fmt             - Format code"
-	@echo "  make lint            - Run linters"
-	@echo "  make deps            - Download dependencies"
-	@echo "  make build-all       - Build for multiple platforms"
-	@echo "  make help            - Show this help message" 
+	@echo ""
+	@echo "Build targets:"
+	@echo "  make build         - Build the binary"
+	@echo "  make run          - Build and run the application"
+	@echo "  make dev          - Run with hot reload (requires air)"
+	@echo "  make build-all    - Build for multiple platforms"
+	@echo "  make install      - Install the binary"
+	@echo ""
+	@echo "Test targets:"
+	@echo "  make test         - Run all tests"
+	@echo "  make test-tui     - Run TUI tests specifically"
+	@echo "  make test-coverage - Run tests with coverage report"
+	@echo "  make test-tui-coverage - Run TUI tests with coverage"
+	@echo "  make test-update  - Update golden files"
+	@echo "  make test-ci      - Run tests in CI mode"
+	@echo "  make test-tui-ci  - Run TUI tests in CI mode"
+	@echo "  make test-performance - Run performance tests"
+	@echo "  make test-scenarios - Run predefined test scenarios"
+	@echo "  make test-workflows - Run workflow tests"
+	@echo ""
+	@echo "TDD targets:"
+	@echo "  make tdd TEST=TestName - Run specific test for TDD"
+	@echo "  make test-failing - Run tests expected to fail"
+	@echo ""
+	@echo "Maintenance targets:"
+	@echo "  make clean        - Clean build artifacts"
+	@echo "  make test-clean   - Clean test artifacts"
+	@echo "  make fmt          - Format code"
+	@echo "  make lint         - Run linters"
+	@echo "  make deps         - Download dependencies"
+	@echo "  make deps-test    - Install testing dependencies"
+	@echo ""
+	@echo "  make help         - Show this help message"
