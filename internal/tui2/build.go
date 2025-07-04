@@ -51,18 +51,7 @@ Remember: Great code is not just working code - it's code that other developers 
 }
 
 // ProcessBuildingRequest handles AI requests for building mode using the agent
-func ProcessBuildingRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (string, error) {
-	// Clear agent history and set system context
-	agent.ClearHistory()
-
-	// Create a combined input with system context
+func ProcessBuildingRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (<-chan agent.StreamEvent, error) {
 	contextualInput := fmt.Sprintf("System context: %s\n\nUser request: %s", GetBuildingSystemPrompt(), userInput)
-
-	// Use agent.Chat which has access to tools including file reading
-	response, err := agent.Chat(ctx, contextualInput)
-	if err != nil {
-		return "", fmt.Errorf("building mode AI request failed: %w", err)
-	}
-
-	return response, nil
+	return agent.StreamEvents(ctx, contextualInput)
 }

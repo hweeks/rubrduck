@@ -206,7 +206,7 @@ func TestGitTool_GetDefinition(t *testing.T) {
 	assert.Contains(t, def.Function.Description, "Git operations")
 
 	// Check parameters
-	params := def.Function.Parameters
+	params := def.Function.Parameters["properties"].(map[string]interface{})
 	assert.NotNil(t, params["operation"])
 	assert.NotNil(t, params["args"])
 	assert.NotNil(t, params["file"])

@@ -44,18 +44,7 @@ Remember: Great planning prevents poor performance. Take time to think through t
 }
 
 // ProcessPlanningRequest handles AI requests for planning mode using the agent
-func ProcessPlanningRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (string, error) {
-	// Clear agent history and set system context
-	agent.ClearHistory()
-
-	// Create a combined input with system context
+func ProcessPlanningRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (<-chan agent.StreamEvent, error) {
 	contextualInput := fmt.Sprintf("System context: %s\n\nUser request: %s", GetPlanningSystemPrompt(), userInput)
-
-	// Use agent.Chat which has access to tools including file reading
-	response, err := agent.Chat(ctx, contextualInput)
-	if err != nil {
-		return "", fmt.Errorf("planning mode AI request failed: %w", err)
-	}
-
-	return response, nil
+	return agent.StreamEvents(ctx, contextualInput)
 }

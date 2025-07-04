@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -176,6 +177,87 @@ func (a *Agent) StreamChat(ctx context.Context, message string, callback func(ch
 	})
 
 	return nil
+}
+
+// StreamEvents processes a user message and emits streaming events.
+func (a *Agent) StreamEvents(ctx context.Context, message string) (<-chan StreamEvent, error) {
+	events := make(chan StreamEvent)
+
+	a.history = append(a.history, ai.Message{
+		Role:    "user",
+		Content: message,
+	})
+
+	req := &ai.ChatRequest{
+		Model:    a.config.Model,
+		Messages: a.history,
+		Tools:    a.getToolDefinitions(),
+		Stream:   true,
+	}
+
+	stream, err := a.provider.StreamChat(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start streaming: %w", err)
+	}
+
+	go func() {
+		defer stream.Close()
+		defer close(events)
+
+		assistant := ai.Message{Role: "assistant"}
+		for {
+			chunk, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				events <- StreamEvent{Type: EventDone, Err: err}
+				return
+			}
+
+			if len(chunk.Choices) > 0 {
+				delta := chunk.Choices[0].Delta
+				if delta.Content != "" {
+					events <- StreamEvent{Type: EventTokenChunk, Token: delta.Content}
+					assistant.Content += delta.Content
+				}
+				if len(delta.ToolCalls) > 0 {
+					assistant.ToolCalls = append(assistant.ToolCalls, delta.ToolCalls...)
+				}
+			}
+		}
+
+		a.history = append(a.history, assistant)
+
+		if len(assistant.ToolCalls) > 0 {
+			toolResults := a.executeToolCalls(ctx, assistant.ToolCalls)
+			a.history = append(a.history, toolResults...)
+			for _, r := range toolResults {
+				events <- StreamEvent{Type: EventToolResult, Result: r.Content}
+			}
+			req := &ai.ChatRequest{
+				Model:    a.config.Model,
+				Messages: a.history,
+				Tools:    a.getToolDefinitions(),
+			}
+			resp, err := a.provider.Chat(ctx, req)
+			if err != nil {
+				events <- StreamEvent{Type: EventDone, Err: err}
+				return
+			}
+			if len(resp.Choices) > 0 {
+				final := resp.Choices[0].Message
+				a.history = append(a.history, final)
+				events <- StreamEvent{Type: EventTokenChunk, Token: final.Content}
+				events <- StreamEvent{Type: EventDone, Usage: resp.Usage}
+				return
+			}
+		}
+
+		events <- StreamEvent{Type: EventDone}
+	}()
+
+	return events, nil
 }
 
 // RegisterTool adds a tool to the agent

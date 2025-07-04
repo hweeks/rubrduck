@@ -170,7 +170,7 @@ func TestShellTool_GetDefinition(t *testing.T) {
 	assert.Contains(t, def.Function.Description, "shell commands")
 
 	// Check parameters
-	params := def.Function.Parameters
+	params := def.Function.Parameters["properties"].(map[string]interface{})
 	assert.NotNil(t, params["command"])
 	assert.NotNil(t, params["timeout"])
 	assert.NotNil(t, params["working_dir"])

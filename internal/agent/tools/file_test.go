@@ -169,7 +169,7 @@ func TestFileTool_GetDefinition(t *testing.T) {
 	assert.Contains(t, def.Function.Description, "file system operations")
 
 	// Check parameters
-	params := def.Function.Parameters
+	params := def.Function.Parameters["properties"].(map[string]interface{})
 	assert.NotNil(t, params["type"])
 	assert.NotNil(t, params["path"])
 	assert.NotNil(t, params["content"])

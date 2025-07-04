@@ -107,6 +107,9 @@ type model struct {
 	messages       []message
 	loading        bool
 	userScrolling  bool
+	streaming      bool
+	partial        string
+	streamCh       <-chan agent.StreamEvent
 
 	// Dimensions
 	width  int
@@ -142,6 +145,9 @@ func newModel(cfg *config.Config, agent *agent.Agent) model {
 		messages:       make([]message, 0),
 		loading:        false,
 		userScrolling:  false,
+		streaming:      false,
+		partial:        "",
+		streamCh:       nil,
 		config:         cfg,
 		agent:          agent,
 	}
@@ -171,6 +177,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
+
+	case streamMsg:
+		switch msg.event.Type {
+		case agent.EventTokenChunk:
+			m.partial += msg.event.Token
+			content := m.renderChatContent() + lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true).Render("AI:    ") + m.partial
+			m.viewport.SetContent(content)
+			if !m.userScrolling {
+				m.viewport.GotoBottom()
+			}
+			return m, listenStream(msg.ch)
+		case agent.EventToolResult:
+			m.partial += "\n" + msg.event.Result
+			content := m.renderChatContent() + lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true).Render("AI:    ") + m.partial
+			m.viewport.SetContent(content)
+			if !m.userScrolling {
+				m.viewport.GotoBottom()
+			}
+			return m, listenStream(msg.ch)
+		case agent.EventDone:
+			m.loading = false
+			m.streaming = false
+			m.messages = append(m.messages, message{sender: "ai", text: m.partial, mode: m.viewMode})
+			m.partial = ""
+			content := m.renderChatContent()
+			m.viewport.SetContent(content)
+			if !m.userScrolling {
+				m.viewport.GotoBottom()
+			}
+			return m, nil
+		default:
+			return m, listenStream(msg.ch)
+		}
 
 	case respondMsg:
 		m.loading = false
@@ -321,10 +360,9 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.userScrolling = false // Reset scrolling state when sending message
 			m.input.Reset()
 			m.loading = true
-			return m, tea.Batch(
-				spinner.Tick,
-				makeAIRequest(userText, m.viewMode, m.agent, m.config.Model),
-			)
+			m.streaming = true
+			cmd := makeAIRequest(userText, m.viewMode, m.agent, m.config.Model)
+			return m, tea.Batch(spinner.Tick, cmd)
 		}
 	}
 
@@ -478,41 +516,51 @@ type respondMsg struct {
 	err      error
 }
 
+type streamMsg struct {
+	event agent.StreamEvent
+	ch    <-chan agent.StreamEvent
+}
+
 // makeAIRequest processes user input through the agent with tools
-func makeAIRequest(input string, mode ViewMode, agent *agent.Agent, model string) tea.Cmd {
+func makeAIRequest(input string, mode ViewMode, ag *agent.Agent, model string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
-		var response string
+		var ch <-chan agent.StreamEvent
 		var err error
 
-		// Route to appropriate mode processor
 		switch mode {
 		case ViewModePlanning:
-			response, err = ProcessPlanningRequest(ctx, agent, input, model)
+			ch, err = ProcessPlanningRequest(ctx, ag, input, model)
 		case ViewModeBuilding:
-			response, err = ProcessBuildingRequest(ctx, agent, input, model)
+			ch, err = ProcessBuildingRequest(ctx, ag, input, model)
 		case ViewModeDebugging:
-			response, err = ProcessDebuggingRequest(ctx, agent, input, model)
+			ch, err = ProcessDebuggingRequest(ctx, ag, input, model)
 		case ViewModeEnhance:
-			response, err = ProcessEnhanceRequest(ctx, agent, input, model)
+			ch, err = ProcessEnhanceRequest(ctx, ag, input, model)
 		default:
 			err = fmt.Errorf("unknown mode: %v", mode)
 		}
 
 		if err != nil {
-			return respondMsg{
-				response: "",
-				mode:     mode,
-				err:      err,
-			}
+			return respondMsg{response: "", mode: mode, err: err}
 		}
 
-		return respondMsg{
-			response: response,
-			mode:     mode,
-			err:      nil,
+		ev, ok := <-ch
+		if !ok {
+			return respondMsg{response: "", mode: mode, err: nil}
 		}
+		return streamMsg{event: ev, ch: ch}
+	}
+}
+
+func listenStream(ch <-chan agent.StreamEvent) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-ch
+		if !ok {
+			return streamMsg{event: agent.StreamEvent{Type: agent.EventDone}, ch: nil}
+		}
+		return streamMsg{event: ev, ch: ch}
 	}
 }
