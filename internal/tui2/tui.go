@@ -288,6 +288,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = false
 			m.streaming = false
 			m.messages = append(m.messages, message{sender: "ai", text: m.partial, mode: m.viewMode})
+
+			// Auto-save planning responses as plans
+			if m.viewMode == ViewModePlanning && m.partial != "" {
+				// Capture the content before clearing it
+				content := m.partial
+				go func() {
+					// Extract title from the first line or use a default
+					lines := strings.Split(strings.TrimSpace(content), "\n")
+					title := "Planning Response"
+					if len(lines) > 0 && strings.TrimSpace(lines[0]) != "" {
+						// Remove markdown headers and use as title
+						firstLine := strings.TrimSpace(lines[0])
+						if strings.HasPrefix(firstLine, "# ") {
+							title = strings.TrimPrefix(firstLine, "# ")
+						} else if strings.HasPrefix(firstLine, "## ") {
+							title = strings.TrimPrefix(firstLine, "## ")
+						} else {
+							title = firstLine
+						}
+					}
+
+					// Create a description from the first few lines
+					description := "AI-generated planning response"
+					if len(lines) > 1 {
+						secondLine := strings.TrimSpace(lines[1])
+						if secondLine != "" && !strings.HasPrefix(secondLine, "#") {
+							description = secondLine
+						}
+					}
+
+					_, err := SavePlanningResponse(title, description, content)
+					if err != nil {
+						// Log error but don't fail the UI
+						fmt.Printf("Warning: failed to save planning response: %v\n", err)
+					}
+				}()
+			}
+
 			m.partial = ""
 			m.streamChunks = 0 // Reset chunk counter
 			content := m.renderChatContent()
