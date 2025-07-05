@@ -24,11 +24,26 @@ type SandboxPolicy struct {
 	BlockedEnvVars  []string `mapstructure:"blocked_env_vars"`
 }
 
+// TokenConfig represents token limit configuration
+type TokenConfig struct {
+	MaxCompletionTokens  int                    `mapstructure:"max_completion_tokens"`
+	MaxContextTokens     int                    `mapstructure:"max_context_tokens"`
+	MaxPlanContentLength int                    `mapstructure:"max_plan_content_length"`
+	ProviderLimits       map[string]TokenLimits `mapstructure:"provider_limits"`
+}
+
+// TokenLimits represents provider-specific token limits
+type TokenLimits struct {
+	MaxCompletionTokens int `mapstructure:"max_completion_tokens"`
+	MaxContextTokens    int `mapstructure:"max_context_tokens"`
+}
+
 // Config represents the complete configuration for RubrDuck
 type Config struct {
 	Provider  string              `mapstructure:"provider"`
 	Model     string              `mapstructure:"model"`
 	Providers map[string]Provider `mapstructure:"providers"`
+	Tokens    TokenConfig         `mapstructure:"tokens"`
 	Agent     AgentConfig         `mapstructure:"agent"`
 	API       APIConfig           `mapstructure:"api"`
 	History   HistoryConfig       `mapstructure:"history"`
@@ -143,6 +158,21 @@ func setDefaults() {
 	viper.SetDefault("providers.anthropic.name", "Anthropic")
 	viper.SetDefault("providers.anthropic.base_url", "https://api.anthropic.com/v1")
 	viper.SetDefault("providers.anthropic.env_key", "ANTHROPIC_API_KEY")
+
+	// Token defaults
+	viper.SetDefault("tokens.max_completion_tokens", 2048)
+	viper.SetDefault("tokens.max_context_tokens", 8000)
+	viper.SetDefault("tokens.max_plan_content_length", 2000)
+
+	// Provider-specific token limits
+	viper.SetDefault("tokens.provider_limits.openai.max_completion_tokens", 2048)
+	viper.SetDefault("tokens.provider_limits.openai.max_context_tokens", 8000)
+	viper.SetDefault("tokens.provider_limits.anthropic.max_completion_tokens", 2048)
+	viper.SetDefault("tokens.provider_limits.anthropic.max_context_tokens", 8000)
+	viper.SetDefault("tokens.provider_limits.gemini.max_completion_tokens", 2048)
+	viper.SetDefault("tokens.provider_limits.gemini.max_context_tokens", 8000)
+	viper.SetDefault("tokens.provider_limits.ollama.max_completion_tokens", 1024)
+	viper.SetDefault("tokens.provider_limits.ollama.max_context_tokens", 4000)
 
 	// Agent defaults
 	viper.SetDefault("agent.approval_mode", "suggest")
