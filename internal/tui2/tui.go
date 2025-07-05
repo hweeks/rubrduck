@@ -766,6 +766,10 @@ func (m model) renderModeSelect() string {
 
 	content += title + "\n\n"
 
+	// Add config summary
+	configSummary := m.renderConfigSummary()
+	content += configSummary + "\n\n"
+
 	for i, mode := range modes {
 		prefix := "  "
 		style := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -787,6 +791,57 @@ func (m model) renderModeSelect() string {
 		Render("Use ↑/↓ to navigate, Enter to select, Ctrl+C to exit")
 
 	return content
+}
+
+// renderConfigSummary renders a summary of the current configuration
+func (m model) renderConfigSummary() string {
+	var summary strings.Builder
+
+	// Config summary box style
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		Padding(0, 1).
+		Margin(0, 0, 1, 0)
+
+	// Title style
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("205"))
+
+	// Info style
+	infoStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
+	// Highlight style for important values
+	highlightStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("2"))
+
+	summary.WriteString(titleStyle.Render("Configuration Summary") + "\n")
+
+	// Provider and model info
+	provider := m.config.Provider
+	model := m.config.Model
+	summary.WriteString(infoStyle.Render("Provider: ") + highlightStyle.Render(provider) + "\n")
+	summary.WriteString(infoStyle.Render("Model: ") + highlightStyle.Render(model) + "\n")
+
+	// Approval mode
+	approvalMode := m.config.Agent.ApprovalMode
+	summary.WriteString(infoStyle.Render("Approval: ") + highlightStyle.Render(approvalMode) + "\n")
+
+	// Sandbox status
+	sandboxStatus := "enabled"
+	if !m.config.Agent.SandboxEnabled {
+		sandboxStatus = "disabled"
+	}
+	summary.WriteString(infoStyle.Render("Sandbox: ") + highlightStyle.Render(sandboxStatus) + "\n")
+
+	// Timeout info
+	timeout := m.config.Agent.Timeout
+	summary.WriteString(infoStyle.Render("Timeout: ") + highlightStyle.Render(fmt.Sprintf("%ds", timeout)))
+
+	return boxStyle.Render(summary.String())
 }
 
 // renderChatMode renders the chat interface for the current mode
