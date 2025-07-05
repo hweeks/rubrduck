@@ -78,28 +78,28 @@ func TestPromptManagerGetPrompt(t *testing.T) {
 			mode:      "planning",
 			variables: nil,
 			wantErr:   false,
-			contains:  []string{"RubrDuck", "PLANNING MODE", "TOOLS AVAILABLE"},
+			contains:  []string{"technical planner", "software architect", "FILE OPERATIONS", "SHELL EXECUTION", "GIT OPERATIONS"},
 		},
 		{
 			name:      "get building prompt",
 			mode:      "building",
 			variables: nil,
 			wantErr:   false,
-			contains:  []string{"RubrDuck", "BUILDING MODE", "TOOLS AVAILABLE"},
+			contains:  []string{"expert software developer", "implementation", "FILE OPERATIONS", "SHELL EXECUTION", "GIT OPERATIONS"},
 		},
 		{
 			name:      "get debugging prompt",
 			mode:      "debugging",
 			variables: nil,
 			wantErr:   false,
-			contains:  []string{"RubrDuck", "DEBUGGING MODE", "TOOLS AVAILABLE"},
+			contains:  []string{"debugging", "FILE OPERATIONS", "SHELL EXECUTION", "GIT OPERATIONS"},
 		},
 		{
 			name:      "get enhance prompt",
 			mode:      "enhance",
 			variables: nil,
 			wantErr:   false,
-			contains:  []string{"RubrDuck", "ENHANCE MODE", "TOOLS AVAILABLE"},
+			contains:  []string{"enhance", "FILE OPERATIONS", "SHELL EXECUTION", "GIT OPERATIONS"},
 		},
 		{
 			name:      "get non-existent prompt",
@@ -188,7 +188,7 @@ system_prompt: |
 		t.Errorf("failed to get building prompt: %v", err)
 	}
 
-	if !strings.Contains(buildPrompt, "BUILDING MODE") {
+	if !strings.Contains(buildPrompt, "expert software developer") {
 		t.Error("expected default building prompt")
 	}
 }
@@ -288,8 +288,8 @@ func TestGetTemplate(t *testing.T) {
 	if tmpl == nil {
 		t.Error("expected template to be non-nil")
 	}
-	if tmpl.Name != "Planning Mode" {
-		t.Errorf("expected template name to be 'Planning Mode', got %s", tmpl.Name)
+	if tmpl.Name != "Planning" {
+		t.Errorf("expected template name to be 'Planning', got %s", tmpl.Name)
 	}
 
 	// Test non-existing template
