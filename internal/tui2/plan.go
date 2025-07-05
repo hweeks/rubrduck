@@ -3,59 +3,135 @@ package tui2
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/hammie/rubrduck/internal/agent"
+	"github.com/hammie/rubrduck/pkg/plans"
 )
 
-// this should be a mode that injects long prompts about planning a project and how to write a plan and what its value it. it should focus on things like full context in a single document and concise planning
+var planManager *plans.Manager
+
+// GetPlanManager returns the global plan manager instance
+func GetPlanManager() (*plans.Manager, error) {
+	if planManager == nil {
+		// Initialize plan manager with .duckie directory in current working directory
+		wd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get working directory: %w", err)
+		}
+
+		duckieDir := filepath.Join(wd, ".duckie")
+		planManager = plans.NewManager(duckieDir)
+
+		if err := planManager.Initialize(); err != nil {
+			return nil, fmt.Errorf("failed to initialize plan manager: %w", err)
+		}
+	}
+	return planManager, nil
+}
 
 // GetPlanningSystemPrompt returns the system prompt for planning mode
-func GetPlanningSystemPrompt() string {
-	return `You are RubrDuck, an expert AI coding assistant specializing in project planning and architecture design.
+func GetPlanningSystemPrompt() (string, error) {
+	pm, err := GetPromptManager()
+	if err != nil {
+		return "", fmt.Errorf("failed to get prompt manager: %w", err)
+	}
 
-PLANNING MODE - CORE PRINCIPLES:
-• Focus on comprehensive, full-context planning in a single coherent document
-• Break down complex projects into clear, manageable phases and tasks
-• Provide concise but thorough analysis of requirements, constraints, and trade-offs
-• Consider the entire system architecture and how components interact
-• Think step-by-step through implementation challenges and dependencies
+	prompt, err := pm.GetPrompt("planning", nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get planning prompt: %w", err)
+	}
 
-YOUR PLANNING METHODOLOGY:
-1. **Context Analysis**: Understand the full scope, existing codebase, and constraints
-2. **Requirements Clarification**: Identify functional and non-functional requirements
-3. **Architecture Design**: Design system components and their interactions
-4. **Task Breakdown**: Create a logical sequence of implementation steps
-5. **Risk Assessment**: Identify potential challenges and mitigation strategies
-6. **Success Criteria**: Define clear metrics for completion
-
-PLANNING OUTPUT FORMAT:
-• Start with a concise executive summary
-• Provide detailed technical analysis
-• Include implementation phases with clear deliverables
-• Highlight critical dependencies and potential blockers
-• Suggest testing and validation strategies
-
-TOOLS AVAILABLE:
-You have access to file operations (read, write, list, search), shell execution, and git operations.
-Use file_operations to read files from the user's computer when you need to understand the existing codebase.
-Use shell_execute to run commands and git_operations to examine the project's git history.
-
-Remember: Great planning prevents poor performance. Take time to think through the full context before providing your structured plan.`
+	return prompt, nil
 }
 
 // ProcessPlanningRequest handles AI requests for planning mode using the agent
-func ProcessPlanningRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (string, error) {
-	// Clear agent history and set system context
-	agent.ClearHistory()
-
-	// Create a combined input with system context
-	contextualInput := fmt.Sprintf("System context: %s\n\nUser request: %s", GetPlanningSystemPrompt(), userInput)
-
-	// Use agent.Chat which has access to tools including file reading
-	response, err := agent.Chat(ctx, contextualInput)
+func ProcessPlanningRequest(ctx context.Context, agent *agent.Agent, userInput, model string) (<-chan agent.StreamEvent, error) {
+	systemPrompt, err := GetPlanningSystemPrompt()
 	if err != nil {
-		return "", fmt.Errorf("planning mode AI request failed: %w", err)
+		return nil, err
 	}
 
-	return response, nil
+	// Get plan context
+	planContext, err := getPlanningContext()
+	if err != nil {
+		// Log error but continue without context
+		fmt.Printf("Warning: failed to get plan context: %v\n", err)
+	}
+
+	// Build contextual input
+	var contextualInput string
+	if planContext != nil && len(planContext.RelatedPlans) > 0 {
+		formatter := plans.NewContextFormatter()
+		formatter.SetIncludeMetadata(false)
+		formatter.SetMaxContentLength(1000)
+		contextStr := formatter.FormatContext(planContext)
+
+		contextualInput = fmt.Sprintf("System context: %s\n\nPlan Context:\n%s\n\nUser request: %s",
+			systemPrompt, contextStr, userInput)
+	} else {
+		contextualInput = fmt.Sprintf("System context: %s\n\nUser request: %s", systemPrompt, userInput)
+	}
+
+	return agent.StreamEvents(ctx, contextualInput)
+}
+
+// getPlanningContext retrieves relevant plan context for planning mode
+func getPlanningContext() (*plans.PlanContext, error) {
+	pm, err := GetPlanManager()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get context for planning mode, including related plans
+	return pm.GetContext("planning", "")
+}
+
+// SavePlanningResponse saves the AI response as a new plan
+func SavePlanningResponse(title, description, content string) (*plans.Plan, error) {
+	pm, err := GetPlanManager()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a new plan from the AI response
+	plan, err := pm.CreatePlan("planning", title, description, content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save planning response: %w", err)
+	}
+
+	return plan, nil
+}
+
+// GetLatestPlanningPlan returns the most recent planning plan
+func GetLatestPlanningPlan() (*plans.Plan, error) {
+	pm, err := GetPlanManager()
+	if err != nil {
+		return nil, err
+	}
+
+	return pm.GetLatestPlan("planning")
+}
+
+// ListPlanningPlans returns all planning plans
+func ListPlanningPlans() ([]plans.PlanSummary, error) {
+	pm, err := GetPlanManager()
+	if err != nil {
+		return nil, err
+	}
+
+	filter := &plans.PlanFilter{Mode: "planning"}
+	return pm.ListPlans(filter)
+}
+
+// SearchPlanningPlans searches for planning plans
+func SearchPlanningPlans(query string) ([]plans.PlanSummary, error) {
+	pm, err := GetPlanManager()
+	if err != nil {
+		return nil, err
+	}
+
+	filter := &plans.PlanFilter{Mode: "planning"}
+	return pm.SearchPlans(query, filter)
 }

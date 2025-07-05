@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -55,15 +56,18 @@ func New(cfg *config.Config) (*Agent, error) {
 
 	// Initialize approval system
 	approvalConfig := &Config{
-		Mode:                    cfg.Agent.ApprovalMode,
-		AutoApproveLowRisk:      cfg.Agent.ApprovalMode == "auto-edit",
-		AutoApproveSafeCommands: cfg.Sandbox.AllowedCommands,
-		AutoApproveSafePaths:    cfg.Sandbox.AllowWritePaths,
-		BlockedCommands:         cfg.Sandbox.BlockedCommands,
-		BlockedPaths:            cfg.Sandbox.BlockPaths,
-		MaxBatchSize:            10,
-		Timeout:                 30 * time.Second,
-		Policies:                make(map[string]Policy),
+		Mode:               cfg.Agent.ApprovalMode,
+		AutoApproveLowRisk: true, // Always auto-approve low-risk operations like git status, file reads
+		AutoApproveSafeCommands: append(cfg.Sandbox.AllowedCommands, []string{
+			"git status", "git log", "git diff", "git show", "git branch",
+			"ls", "pwd", "cat", "head", "tail", "grep", "find", "which",
+		}...),
+		AutoApproveSafePaths: cfg.Sandbox.AllowWritePaths,
+		BlockedCommands:      cfg.Sandbox.BlockedCommands,
+		BlockedPaths:         cfg.Sandbox.BlockPaths,
+		MaxBatchSize:         10,
+		Timeout:              time.Duration(cfg.Agent.Timeout) * time.Second,
+		Policies:             make(map[string]Policy),
 	}
 
 	// Create approval callback that will be set by the TUI
@@ -176,6 +180,446 @@ func (a *Agent) StreamChat(ctx context.Context, message string, callback func(ch
 	})
 
 	return nil
+}
+
+// StreamEvents processes a user message and emits streaming events.
+func (a *Agent) StreamEvents(ctx context.Context, message string) (<-chan StreamEvent, error) {
+	events := make(chan StreamEvent)
+
+	a.history = append(a.history, ai.Message{
+		Role:    "user",
+		Content: message,
+	})
+
+	req := &ai.ChatRequest{
+		Model:    a.config.Model,
+		Messages: a.history,
+		Tools:    a.getToolDefinitions(),
+		Stream:   true,
+	}
+
+	log.Debug().
+		Str("provider", a.config.Provider).
+		Str("model", a.config.Model).
+		Int("message_count", len(a.history)).
+		Int("tool_count", len(a.tools)).
+		Str("user_message", message).
+		Msg("Starting streaming chat")
+
+	stream, err := a.provider.StreamChat(ctx, req)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("provider", a.config.Provider).
+			Str("model", a.config.Model).
+			Msg("Failed to start streaming chat")
+		return nil, fmt.Errorf("failed to start streaming: %w", err)
+	}
+
+	go func() {
+		defer stream.Close()
+		defer close(events)
+
+		assistant := ai.Message{Role: "assistant"}
+		var pendingToolCalls []ai.ToolCall
+		chunkCount := 0
+
+		log.Debug().Msg("Starting to process streaming chunks")
+
+		for {
+			chunk, err := stream.Recv()
+			chunkCount++
+
+			if err != nil {
+				if err == io.EOF {
+					log.Debug().
+						Int("total_chunks", chunkCount).
+						Msg("Stream completed normally")
+					break
+				}
+				log.Error().
+					Err(err).
+					Int("chunk_number", chunkCount).
+					Str("provider", a.config.Provider).
+					Msg("Streaming error occurred")
+				events <- StreamEvent{Type: EventDone, Err: err}
+				return
+			}
+
+			log.Trace().
+				Int("chunk_number", chunkCount).
+				Int("choices_count", len(chunk.Choices)).
+				Msg("Processing chunk")
+
+			if len(chunk.Choices) > 0 {
+				delta := chunk.Choices[0].Delta
+
+				// Handle content streaming
+				if delta.Content != "" {
+					log.Trace().
+						Str("content", delta.Content).
+						Int("content_length", len(delta.Content)).
+						Msg("Received content chunk")
+					events <- StreamEvent{Type: EventTokenChunk, Token: delta.Content}
+					assistant.Content += delta.Content
+				}
+
+				// Handle tool call deltas - accumulate properly
+				if len(delta.ToolCalls) > 0 {
+					log.Debug().
+						Int("tool_calls_in_delta", len(delta.ToolCalls)).
+						Int("existing_tool_calls", len(pendingToolCalls)).
+						Msg("Processing tool call delta")
+
+					// Log the raw tool call data for debugging only if we have substantial content
+					for i, tc := range delta.ToolCalls {
+						if tc.ID != "" || tc.Function.Name != "" || len(tc.Function.Arguments) > 5 {
+							log.Trace().
+								Int("tool_call_index", i).
+								Str("tool_call_id", tc.ID).
+								Str("tool_call_type", tc.Type).
+								Str("function_name", tc.Function.Name).
+								Str("function_args", tc.Function.Arguments).
+								Msg("Tool call delta details")
+						}
+					}
+
+					pendingToolCalls = a.mergeToolCallDeltas(pendingToolCalls, delta.ToolCalls)
+
+					// Only log after significant changes, not every character fragment
+					if chunkCount%20 == 0 || len(pendingToolCalls) != len(delta.ToolCalls) {
+						log.Debug().
+							Int("pending_tool_calls_after_merge", len(pendingToolCalls)).
+							Msg("Tool calls merged")
+					}
+				}
+			}
+		}
+
+		// Add the assistant message to history
+		assistant.ToolCalls = pendingToolCalls
+		a.history = append(a.history, assistant)
+
+		log.Info().
+			Int("final_content_length", len(assistant.Content)).
+			Int("final_tool_calls", len(pendingToolCalls)).
+			Msg("Streaming completed, processing tool calls")
+
+		// Process any complete tool calls
+		if len(pendingToolCalls) > 0 {
+			// Emit tool request events for approval
+			for i, toolCall := range pendingToolCalls {
+				log.Debug().
+					Int("tool_call_index", i).
+					Str("tool_call_id", toolCall.ID).
+					Str("tool_name", toolCall.Function.Name).
+					Str("tool_args", toolCall.Function.Arguments).
+					Msg("Processing tool call")
+
+				// Validate tool call before requesting approval
+				if toolCall.Function.Name == "" || toolCall.Function.Arguments == "" {
+					log.Warn().
+						Str("tool_call_id", toolCall.ID).
+						Str("function_name", toolCall.Function.Name).
+						Str("arguments", toolCall.Function.Arguments).
+						Msg("Skipping incomplete tool call")
+
+					events <- StreamEvent{
+						Type:   EventToolResult,
+						ToolID: toolCall.ID,
+						Result: fmt.Sprintf("Error: Incomplete tool call - name='%s', args='%s'", toolCall.Function.Name, toolCall.Function.Arguments),
+					}
+					continue
+				}
+
+				log.Debug().
+					Str("tool_call_id", toolCall.ID).
+					Str("tool_name", toolCall.Function.Name).
+					Msg("Requesting approval for tool call")
+
+				// Request approval for the tool execution
+				approvalResult, err := a.approvalSystem.RequestApproval(ctx, toolCall.Function.Name, toolCall.Function.Arguments, toolCall)
+				if err != nil {
+					log.Error().
+						Err(err).
+						Str("tool_call_id", toolCall.ID).
+						Str("tool_name", toolCall.Function.Name).
+						Msg("Approval request failed")
+
+					events <- StreamEvent{
+						Type:     EventToolResult,
+						ToolID:   toolCall.ID,
+						ToolName: toolCall.Function.Name,
+						Result:   fmt.Sprintf("Error: Approval failed for %s: %v", toolCall.Function.Name, err),
+					}
+					continue
+				}
+
+				if !approvalResult.Approved {
+					log.Info().
+						Str("tool_call_id", toolCall.ID).
+						Str("tool_name", toolCall.Function.Name).
+						Str("denial_reason", approvalResult.Reason).
+						Msg("Tool call denied")
+
+					events <- StreamEvent{
+						Type:     EventToolResult,
+						ToolID:   toolCall.ID,
+						ToolName: toolCall.Function.Name,
+						Result:   fmt.Sprintf("Operation denied: %s", approvalResult.Reason),
+					}
+					continue
+				}
+
+				log.Info().
+					Str("tool_call_id", toolCall.ID).
+					Str("tool_name", toolCall.Function.Name).
+					Str("approval_reason", approvalResult.Reason).
+					Msg("Tool call approved, executing")
+
+				// Execute the approved tool
+				tool, ok := a.tools[toolCall.Function.Name]
+				if !ok {
+					log.Error().
+						Str("tool_call_id", toolCall.ID).
+						Str("tool_name", toolCall.Function.Name).
+						Strs("available_tools", func() []string {
+							var names []string
+							for name := range a.tools {
+								names = append(names, name)
+							}
+							return names
+						}()).
+						Msg("Unknown tool requested")
+
+					events <- StreamEvent{
+						Type:     EventToolResult,
+						ToolID:   toolCall.ID,
+						ToolName: toolCall.Function.Name,
+						Result:   fmt.Sprintf("Error: Unknown tool '%s'", toolCall.Function.Name),
+					}
+					continue
+				}
+
+				startTime := time.Now()
+				result, err := tool.Execute(ctx, toolCall.Function.Arguments)
+				duration := time.Since(startTime)
+
+				if err != nil {
+					log.Error().
+						Err(err).
+						Str("tool_call_id", toolCall.ID).
+						Str("tool_name", toolCall.Function.Name).
+						Dur("execution_duration", duration).
+						Msg("Tool execution failed")
+
+					events <- StreamEvent{
+						Type:     EventToolResult,
+						ToolID:   toolCall.ID,
+						ToolName: toolCall.Function.Name,
+						Result:   fmt.Sprintf("Error executing %s: %v", toolCall.Function.Name, err),
+					}
+				} else {
+					log.Info().
+						Str("tool_call_id", toolCall.ID).
+						Str("tool_name", toolCall.Function.Name).
+						Dur("execution_duration", duration).
+						Int("result_length", len(result)).
+						Msg("Tool execution completed successfully")
+
+					events <- StreamEvent{
+						Type:     EventToolResult,
+						ToolID:   toolCall.ID,
+						ToolName: toolCall.Function.Name,
+						Result:   result,
+					}
+				}
+
+				// Add tool result to history
+				a.history = append(a.history, ai.Message{
+					Role:       "tool",
+					Content:    result,
+					ToolCallID: toolCall.ID,
+				})
+			}
+
+			log.Debug().Msg("Getting final response after tool execution")
+
+			// Get final response after tool execution
+			// Don't include tools since we've already executed them
+			req := &ai.ChatRequest{
+				Model:    a.config.Model,
+				Messages: a.history,
+				// Tools:    a.getToolDefinitions(), // Remove tools to avoid confusion
+			}
+			resp, err := a.provider.Chat(ctx, req)
+			if err != nil {
+				log.Error().
+					Err(err).
+					Str("provider", a.config.Provider).
+					Msg("Failed to get final response after tool execution")
+				events <- StreamEvent{Type: EventDone, Err: err}
+				return
+			}
+			if len(resp.Choices) > 0 {
+				final := resp.Choices[0].Message
+				a.history = append(a.history, final)
+
+				log.Info().
+					Int("final_response_length", len(final.Content)).
+					Msg("Final response received")
+
+				events <- StreamEvent{Type: EventTokenChunk, Token: final.Content}
+				events <- StreamEvent{Type: EventDone, Usage: resp.Usage}
+				return
+			}
+		}
+
+		log.Info().Msg("Stream processing completed")
+		events <- StreamEvent{Type: EventDone}
+	}()
+
+	return events, nil
+}
+
+// mergeToolCallDeltas properly accumulates tool call deltas from streaming
+func (a *Agent) mergeToolCallDeltas(existing []ai.ToolCall, newDeltas []ai.ToolCall) []ai.ToolCall {
+	// OpenAI sends tool call deltas with an index to indicate which tool call they belong to
+	// We need to properly merge based on the position/index and streaming pattern
+
+	for _, delta := range newDeltas {
+		// Only log substantial deltas to avoid spam
+		if delta.ID != "" || delta.Function.Name != "" || len(delta.Function.Arguments) > 10 {
+			log.Trace().
+				Str("delta_id", delta.ID).
+				Str("delta_type", delta.Type).
+				Str("delta_function_name", delta.Function.Name).
+				Str("delta_function_args", delta.Function.Arguments).
+				Int("existing_count", len(existing)).
+				Msg("Processing tool call delta")
+		}
+
+		// For OpenAI streaming, we need to handle several patterns:
+		// 1. First delta has ID and function name
+		// 2. Subsequent deltas have empty ID/name but contain argument fragments
+		// 3. We need to merge fragments into the most recent tool call
+
+		var targetCall *ai.ToolCall
+		targetIndex := -1
+
+		// Strategy 1: Try to find exact ID match first
+		if delta.ID != "" {
+			for i := range existing {
+				if existing[i].ID == delta.ID {
+					targetCall = &existing[i]
+					targetIndex = i
+					break
+				}
+			}
+		}
+
+		// Strategy 2: If no ID match and this delta has function name, try to find by name
+		if targetCall == nil && delta.Function.Name != "" {
+			for i := range existing {
+				if existing[i].Function.Name == delta.Function.Name && existing[i].ID != "" {
+					targetCall = &existing[i]
+					targetIndex = i
+					break
+				}
+			}
+		}
+
+		// Strategy 3: If this delta has no ID/name but has arguments, it's likely a fragment
+		// that should be merged into the most recent tool call
+		if targetCall == nil && delta.ID == "" && delta.Function.Name == "" && delta.Function.Arguments != "" {
+			if len(existing) > 0 {
+				// Use the last (most recent) tool call
+				targetCall = &existing[len(existing)-1]
+				targetIndex = len(existing) - 1
+				if len(delta.Function.Arguments) > 20 { // Only log substantial merges
+					log.Trace().
+						Int("target_index", targetIndex).
+						Str("target_id", targetCall.ID).
+						Str("fragment", delta.Function.Arguments).
+						Msg("Merging argument fragment into most recent tool call")
+				}
+			}
+		}
+
+		if targetCall == nil {
+			// This is a new tool call, append it
+			log.Trace().
+				Str("delta_id", delta.ID).
+				Str("delta_function_name", delta.Function.Name).
+				Msg("Creating new tool call from delta")
+			existing = append(existing, delta)
+		} else {
+			// Merge the delta into the existing tool call
+			if delta.ID != "" || delta.Function.Name != "" || len(delta.Function.Arguments) > 20 {
+				log.Trace().
+					Int("target_index", targetIndex).
+					Str("existing_id", targetCall.ID).
+					Str("delta_id", delta.ID).
+					Str("delta_args", delta.Function.Arguments).
+					Msg("Merging delta into existing tool call")
+			}
+
+			// Only update non-empty fields
+			if delta.Type != "" {
+				targetCall.Type = delta.Type
+			}
+			if delta.ID != "" {
+				targetCall.ID = delta.ID
+			}
+			if delta.Function.Name != "" {
+				targetCall.Function.Name = delta.Function.Name
+			}
+			if delta.Function.Arguments != "" {
+				// For streaming, arguments come in fragments, so append them
+				targetCall.Function.Arguments += delta.Function.Arguments
+
+				// Warn if arguments are getting very large
+				if len(targetCall.Function.Arguments) > 100000 { // 100KB
+					log.Warn().
+						Str("tool_id", targetCall.ID).
+						Str("tool_name", targetCall.Function.Name).
+						Int("args_size", len(targetCall.Function.Arguments)).
+						Msg("Tool call arguments are very large - this may cause timeout issues")
+				}
+			}
+		}
+	}
+
+	// Log final state for debugging - only log every 100 calls or when complete
+	if len(existing) == 1 || len(newDeltas) == 0 {
+		for i, tc := range existing {
+			// Log warning for very large tool calls
+			if len(tc.Function.Arguments) > 50000 { // 50KB
+				log.Warn().
+					Int("index", i).
+					Str("id", tc.ID).
+					Str("name", tc.Function.Name).
+					Int("args_length", len(tc.Function.Arguments)).
+					Msg("Large tool call detected - consider breaking into smaller operations")
+			} else {
+				log.Trace().
+					Int("index", i).
+					Str("id", tc.ID).
+					Str("type", tc.Type).
+					Str("name", tc.Function.Name).
+					Int("args_length", len(tc.Function.Arguments)).
+					Str("args_preview", func() string {
+						if len(tc.Function.Arguments) > 50 {
+							return tc.Function.Arguments[:50] + "..."
+						}
+						return tc.Function.Arguments
+					}()).
+					Msg("Final tool call state")
+			}
+		}
+	}
+
+	return existing
 }
 
 // RegisterTool adds a tool to the agent
