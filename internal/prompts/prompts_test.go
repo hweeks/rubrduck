@@ -287,6 +287,7 @@ func TestGetTemplate(t *testing.T) {
 	}
 	if tmpl == nil {
 		t.Error("expected template to be non-nil")
+		return
 	}
 	if tmpl.Name != "Planning Mode" {
 		t.Errorf("expected template name to be 'Planning Mode', got %s", tmpl.Name)

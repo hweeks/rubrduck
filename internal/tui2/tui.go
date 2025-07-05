@@ -228,7 +228,7 @@ func newModel(cfg *config.Config, agent *agent.Agent) model {
 
 // Init is the initial command for Bubble Tea.
 func (m model) Init() tea.Cmd {
-	return spinner.Tick
+	return m.spinner.Tick
 }
 
 // Update handles incoming messages and updates the model state.
@@ -550,6 +550,7 @@ func (m model) updateModeSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updateModeSelectMouse handles mouse events in mode selection
 func (m model) updateModeSelectMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	//nolint:staticcheck // Using deprecated API because modern constants aren't available in this version
 	switch msg.Type {
 	case tea.MouseWheelUp:
 		// Scroll up - same as KeyUp
@@ -677,12 +678,12 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyUp:
 		// Allow scrolling up in the viewport
-		m.viewport.LineUp(1)
+		m.viewport.ScrollUp(1)
 		m.userScrolling = true
 		return m, nil
 	case tea.KeyDown:
 		// Allow scrolling down in the viewport
-		m.viewport.LineDown(1)
+		m.viewport.ScrollDown(1)
 		// Check if we scrolled back to the bottom
 		if m.viewport.AtBottom() {
 			m.userScrolling = false
@@ -712,7 +713,7 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.streaming = true
 			m.streamChunks = 0 // Reset chunk counter for new stream
 			cmd := makeAIRequest(userText, m.viewMode, m.agent, m.config)
-			return m, tea.Batch(spinner.Tick, cmd)
+			return m, tea.Batch(m.spinner.Tick, cmd)
 		}
 	}
 
@@ -724,15 +725,16 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updateChatModeMouse handles mouse events in chat mode
 func (m model) updateChatModeMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	//nolint:staticcheck // Using deprecated API because modern constants aren't available in this version
 	switch msg.Type {
 	case tea.MouseWheelUp:
 		// Scroll up in viewport - same as KeyUp
-		m.viewport.LineUp(1)
+		m.viewport.ScrollUp(1)
 		m.userScrolling = true
 		return m, nil
 	case tea.MouseWheelDown:
 		// Scroll down in viewport - same as KeyDown
-		m.viewport.LineDown(1)
+		m.viewport.ScrollDown(1)
 		// Check if we scrolled back to the bottom
 		if m.viewport.AtBottom() {
 			m.userScrolling = false
