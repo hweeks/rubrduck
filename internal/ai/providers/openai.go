@@ -184,9 +184,10 @@ func (p *OpenAIProvider) convertRequest(req *ai.ChatRequest) map[string]interfac
 	}
 
 	openAIReq := map[string]interface{}{
-		"model":    req.Model,
-		"messages": messages,
-		"stream":   req.Stream,
+		"model":      req.Model,
+		"messages":   messages,
+		"stream":     req.Stream,
+		"max_tokens": 2048, // Reduced to leave more room for input context
 	}
 
 	if req.Temperature > 0 {

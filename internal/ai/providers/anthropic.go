@@ -177,7 +177,7 @@ func (p *AnthropicProvider) convertRequest(req *ai.ChatRequest) map[string]inter
 	anthropicReq := map[string]interface{}{
 		"model":      p.convertModel(req.Model),
 		"messages":   messages,
-		"max_tokens": 4096, // Default max tokens for Claude
+		"max_tokens": 2048, // Reduced to leave more room for input context
 	}
 
 	if req.Temperature > 0 {

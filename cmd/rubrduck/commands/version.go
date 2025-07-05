@@ -8,9 +8,11 @@ import (
 )
 
 var (
-	// These variables are set at build time using ldflags
-	Version   = "dev"
+	// Version is the version of RubrDuck, set at build time using ldflags
+	Version = "dev"
+	// GitCommit is the git commit hash, set at build time using ldflags
 	GitCommit = "unknown"
+	// BuildDate is the build date, set at build time using ldflags
 	BuildDate = "unknown"
 )
 

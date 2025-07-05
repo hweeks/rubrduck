@@ -18,7 +18,7 @@ func NewContextFormatter() *ContextFormatter {
 	return &ContextFormatter{
 		includeMetadata:  true,
 		includeRelated:   true,
-		maxContentLength: 2000, // Limit content length to avoid token limits
+		maxContentLength: 2000, // Very conservative to avoid token overflow
 	}
 }
 
@@ -158,7 +158,7 @@ func (cf *ContextFormatter) FormatContextForPrompt(context *PlanContext) string 
 
 	formatter := NewContextFormatter()
 	formatter.SetIncludeMetadata(false) // Don't include metadata in prompts
-	formatter.SetMaxContentLength(1000) // Shorter for prompts
+	formatter.SetMaxContentLength(500)  // Shorter for prompts
 
 	return formatter.FormatContext(context)
 }

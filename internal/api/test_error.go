@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// TestMaxBytesError tests the behavior when a request body exceeds the maximum allowed size
 func TestMaxBytesError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 10) // Very small limit

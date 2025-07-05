@@ -210,20 +210,20 @@ func (v *TokenValidator) ValidateToken(token string) (*TokenClaims, error) {
 
 // API Key validation implementation
 
-// APIKeyValidator validates API keys
-type APIKeyValidator struct {
-	config APIKeyValidatorConfig
+// KeyValidator validates API keys
+type KeyValidator struct {
+	config KeyValidatorConfig
 }
 
-// NewAPIKeyValidator creates an API key validator
-func NewAPIKeyValidator(config APIKeyValidatorConfig) *APIKeyValidator {
-	return &APIKeyValidator{
+// NewKeyValidator creates an API key validator
+func NewKeyValidator(config KeyValidatorConfig) *KeyValidator {
+	return &KeyValidator{
 		config: config,
 	}
 }
 
 // ValidateAPIKey validates an API key
-func (v *APIKeyValidator) ValidateAPIKey(key string) (*APIKeyInfo, error) {
+func (v *KeyValidator) ValidateAPIKey(key string) (*KeyInfo, error) {
 	info, exists := v.config.ValidKeys[key]
 	if !exists {
 		return nil, fmt.Errorf("invalid API key")
@@ -238,7 +238,7 @@ func (v *APIKeyValidator) ValidateAPIKey(key string) (*APIKeyInfo, error) {
 }
 
 // HasPermission checks if the API key has a permission
-func (info *APIKeyInfo) HasPermission(permission string) bool {
+func (info *KeyInfo) HasPermission(permission string) bool {
 	for _, p := range info.Permissions {
 		if p == permission {
 			return true

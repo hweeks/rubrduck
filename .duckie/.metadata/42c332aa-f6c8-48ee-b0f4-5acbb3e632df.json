@@ -1,0 +1,12 @@
+{
+  "id": "42c332aa-f6c8-48ee-b0f4-5acbb3e632df",
+  "title": "Executive Summary",
+  "mode": "planning",
+  "description": "The project requires creating unit tests for the file `openAIStream` found in the `internal/ai` directory, which contains the implementation of the `ai.ChatStream` interface. The tests should validate the correct functionality of the methods and the expected outcomes in various scenarios.",
+  "created": "2025-07-05T11:11:15.593635-07:00",
+  "updated": "2025-07-05T11:11:15.593635-07:00",
+  "version": 1,
+  "status": "draft",
+  "tags": null,
+  "author": ""
+}

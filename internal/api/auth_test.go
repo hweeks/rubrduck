@@ -237,8 +237,8 @@ func TestTokenValidation(t *testing.T) {
 }
 
 func TestAPIKeyValidation(t *testing.T) {
-	validator := NewAPIKeyValidator(APIKeyValidatorConfig{
-		ValidKeys: map[string]APIKeyInfo{
+	validator := NewKeyValidator(KeyValidatorConfig{
+		ValidKeys: map[string]KeyInfo{
 			"sk-test-key-1": {
 				UserID:      "user-1",
 				Permissions: []string{"read", "write"},

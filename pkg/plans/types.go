@@ -92,5 +92,5 @@ const (
 	StatusArchived  = "archived"
 )
 
-// Supported modes
+// SupportedModes contains the list of supported plan modes
 var SupportedModes = []string{"planning", "building", "debugging", "enhance"}

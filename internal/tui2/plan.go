@@ -65,7 +65,7 @@ func ProcessPlanningRequest(ctx context.Context, agent *agent.Agent, userInput, 
 	if planContext != nil && len(planContext.RelatedPlans) > 0 {
 		formatter := plans.NewContextFormatter()
 		formatter.SetIncludeMetadata(false)
-		formatter.SetMaxContentLength(1000)
+		formatter.SetMaxContentLength(500)
 		contextStr := formatter.FormatContext(planContext)
 
 		contextualInput = fmt.Sprintf("System context: %s\n\nPlan Context:\n%s\n\nUser request: %s",

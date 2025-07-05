@@ -27,7 +27,6 @@ type ChatRequest struct {
 	Tools       []Tool    `json:"tools,omitempty"`
 }
 
-// Message represents a chat message
 // MessagePart represents either text or image content within a message.
 type MessagePart struct {
 	Type     string `json:"type"`                // "text" or "image_url"
