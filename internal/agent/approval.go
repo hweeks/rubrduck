@@ -28,9 +28,13 @@ type ApprovalRequest struct {
 type RiskLevel string
 
 const (
-	RiskLow      RiskLevel = "low"
-	RiskMedium   RiskLevel = "medium"
-	RiskHigh     RiskLevel = "high"
+	// RiskLow represents a low-risk operation
+	RiskLow RiskLevel = "low"
+	// RiskMedium represents a medium-risk operation
+	RiskMedium RiskLevel = "medium"
+	// RiskHigh represents a high-risk operation
+	RiskHigh RiskLevel = "high"
+	// RiskCritical represents a critical-risk operation
 	RiskCritical RiskLevel = "critical"
 )
 

@@ -21,14 +21,19 @@ import (
 type ViewMode int
 
 const (
+	// ViewModeSelect represents the mode selection view
 	ViewModeSelect ViewMode = iota
+	// ViewModePlanning represents the planning mode view
 	ViewModePlanning
+	// ViewModeBuilding represents the building mode view
 	ViewModeBuilding
+	// ViewModeDebugging represents the debugging mode view
 	ViewModeDebugging
+	// ViewModeEnhance represents the enhance mode view
 	ViewModeEnhance
 )
 
-// Mode info for selection and display
+// ModeInfo provides information about a TUI mode for selection and display
 type ModeInfo struct {
 	Name        string
 	Description string

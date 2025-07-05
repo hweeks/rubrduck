@@ -137,17 +137,17 @@ func (f *FallbackSandbox) isPathAccessible(path string, readOnly bool) bool {
 		if _, err := os.Open(path); err != nil {
 			return false
 		}
-	} else {
-		// Check write permission by trying to create a temp file
-		tempFile := filepath.Join(path, ".rubrduck-test")
-		if file, err := os.Create(tempFile); err != nil {
-			return false
-		} else {
-			file.Close()
-			os.Remove(tempFile)
-		}
+		return true
 	}
 
+	// Check write permission by trying to create a temp file
+	tempFile := filepath.Join(path, ".rubrduck-test")
+	file, err := os.Create(tempFile)
+	if err != nil {
+		return false
+	}
+	file.Close()
+	os.Remove(tempFile)
 	return true
 }
 

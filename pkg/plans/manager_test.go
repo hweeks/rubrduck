@@ -463,12 +463,8 @@ func TestManager_Initialize(t *testing.T) {
 		t.Fatalf("failed to initialize: %v", err)
 	}
 
-	// Verify directories were created
+	// Verify only .metadata directory was created
 	expectedDirs := []string{
-		"planning",
-		"building",
-		"debugging",
-		"enhance",
 		".metadata",
 	}
 

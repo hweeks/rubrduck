@@ -92,13 +92,13 @@ type TokenValidatorConfig struct {
 	RefreshExpiration time.Duration
 }
 
-// APIKeyValidatorConfig holds API key validator configuration
-type APIKeyValidatorConfig struct {
-	ValidKeys map[string]APIKeyInfo
+// KeyValidatorConfig holds API key validator configuration
+type KeyValidatorConfig struct {
+	ValidKeys map[string]KeyInfo
 }
 
-// APIKeyInfo holds information about an API key
-type APIKeyInfo struct {
+// KeyInfo holds information about an API key
+type KeyInfo struct {
 	UserID      string
 	Permissions []string
 	RateLimit   int
@@ -199,6 +199,7 @@ type AuthMiddleware struct {
 	rateLimiter *RateLimiter
 }
 
+// SetRateLimiter sets the rate limiter for the auth middleware
 func (a *AuthMiddleware) SetRateLimiter(limiter *RateLimiter) {
 	a.rateLimiter = limiter
 }
