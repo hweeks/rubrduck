@@ -217,6 +217,25 @@ logging:
   # Max number of old log files to keep
   max_backups: 3
 
+# Prompts Configuration
+prompts:
+  # Directory containing custom prompt templates (YAML files)
+  # Templates in this directory will override default prompts
+  # Leave empty to use only default prompts
+  custom_dir: ~/.rubrduck/prompts
+
+  # Example custom prompt structure:
+  # Create a file like ~/.rubrduck/prompts/planning.yaml:
+  # ---
+  # name: "Custom Planning Mode"
+  # description: "My custom planning prompt"
+  # system_prompt: |
+  #   You are RubrDuck, customized for my specific needs...
+  #   [Your custom prompt here]
+  # variables:
+  #   project_name: "MyProject"
+  #   language: "Go"
+
 # Tools Configuration
 tools:
   # Enable specific tools

@@ -36,6 +36,8 @@ type Config struct {
 	// TUI holds configuration for the terminal user interface
 	TUI     TUIConfig     `mapstructure:"tui"`
 	Logging LoggingConfig `mapstructure:"logging"`
+	// Prompts holds configuration for prompt templates
+	Prompts PromptsConfig `mapstructure:"prompts"`
 }
 
 // TUIConfig holds settings for the terminal UI modes
@@ -49,6 +51,12 @@ type TUIConfig struct {
 	BuildingTimeout int `mapstructure:"building_timeout"`
 	DebugTimeout    int `mapstructure:"debug_timeout"`
 	EnhanceTimeout  int `mapstructure:"enhance_timeout"`
+}
+
+// PromptsConfig holds configuration for prompt templates
+type PromptsConfig struct {
+	// CustomDir specifies the directory containing custom prompt templates
+	CustomDir string `mapstructure:"custom_dir"`
 }
 
 // Provider represents an AI provider configuration
@@ -185,6 +193,9 @@ func setDefaults() {
 	viper.SetDefault("logging.file", "")
 	viper.SetDefault("logging.max_size", 10)
 	viper.SetDefault("logging.max_backups", 3)
+
+	// Prompts defaults
+	viper.SetDefault("prompts.custom_dir", "")
 }
 
 // Validate validates the configuration
