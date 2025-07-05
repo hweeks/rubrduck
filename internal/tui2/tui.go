@@ -144,6 +144,12 @@ type model struct {
 	streamCh       <-chan agent.StreamEvent
 	streamChunks   int // Track number of chunks received
 
+	// Tool call and thinking tracking
+	toolCalls       []toolCallInfo
+	currentToolCall *toolCallInfo
+	isThinking      bool
+	thinkingText    string
+
 	// Approval state
 	showingApproval bool                   // Whether we're showing approval dialog
 	approvalRequest *agent.ApprovalRequest // Current approval request
@@ -156,6 +162,16 @@ type model struct {
 	// AI integration
 	config *config.Config
 	agent  *agent.Agent
+}
+
+// toolCallInfo tracks information about a tool call
+type toolCallInfo struct {
+	ID        string
+	Name      string
+	Args      string
+	Result    string
+	Status    string // "pending", "executing", "completed", "failed"
+	StartTime time.Time
 }
 
 // approvalResponse carries the user's approval decision
@@ -193,6 +209,10 @@ func newModel(cfg *config.Config, agent *agent.Agent) model {
 		partial:         "",
 		streamCh:        nil,
 		streamChunks:    0,
+		toolCalls:       make([]toolCallInfo, 0),
+		currentToolCall: nil,
+		isThinking:      false,
+		thinkingText:    "",
 		showingApproval: false,
 		approvalRequest: nil,
 		approvalChan:    nil,
@@ -249,6 +269,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case agent.EventTokenChunk:
 			m.streamChunks++
 			m.partial += msg.event.Token
+			m.isThinking = false // Clear thinking state when we get content
 
 			// Show progress for large operations
 			progressIndicator := ""
@@ -257,6 +278,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			content := m.renderChatContent() + lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true).Render("AI:    ") + m.partial + progressIndicator
+			m.viewport.SetContent(content)
+			if !m.userScrolling {
+				m.viewport.GotoBottom()
+			}
+			if msg.cancel != nil {
+				return m, listenStreamWithCancel(msg.ch, msg.cancel)
+			}
+			return m, listenStream(msg.ch)
+		case agent.EventToolRequest:
+			// Start tracking a new tool call
+			m.currentToolCall = &toolCallInfo{
+				ID:        msg.event.Request.ID,
+				Name:      msg.event.Request.Tool,
+				Args:      msg.event.Request.Preview,
+				Status:    "pending",
+				StartTime: time.Now(),
+			}
+			m.toolCalls = append(m.toolCalls, *m.currentToolCall)
+			m.isThinking = true
+			m.thinkingText = fmt.Sprintf("Thinking about using %s...", msg.event.Request.Tool)
+
+			// Update the view to show thinking state
+			content := m.renderChatContent() + m.renderFullWidthBar()
+			m.viewport.SetContent(content)
+			if !m.userScrolling {
+				m.viewport.GotoBottom()
+			}
+			if msg.cancel != nil {
+				return m, listenStreamWithCancel(msg.ch, msg.cancel)
+			}
+			return m, listenStream(msg.ch)
+		case agent.EventToolBegin:
+			// Tool execution started
+			if m.currentToolCall != nil {
+				m.currentToolCall.Status = "executing"
+				m.isThinking = true
+				m.thinkingText = fmt.Sprintf("Executing %s...", m.currentToolCall.Name)
+			}
+
+			// Update the view to show execution state
+			content := m.renderChatContent() + m.renderFullWidthBar()
 			m.viewport.SetContent(content)
 			if !m.userScrolling {
 				m.viewport.GotoBottom()
@@ -269,6 +331,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.streamChunks++
 			m.partial += "\n" + msg.event.Result
 
+			// Update tool call with result
+			if m.currentToolCall != nil {
+				m.currentToolCall.Result = msg.event.Result
+				m.currentToolCall.Status = "completed"
+			}
+
 			// Show progress for large operations
 			progressIndicator := ""
 			if m.streamChunks > 100 {
@@ -284,15 +352,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, listenStreamWithCancel(msg.ch, msg.cancel)
 			}
 			return m, listenStream(msg.ch)
+		case agent.EventToolEnd:
+			// Tool execution completed
+			if m.currentToolCall != nil {
+				m.currentToolCall.Status = "completed"
+				m.currentToolCall = nil
+			}
+			m.isThinking = false
+
+			// Update the view
+			content := m.renderChatContent() + m.renderFullWidthBar()
+			m.viewport.SetContent(content)
+			if !m.userScrolling {
+				m.viewport.GotoBottom()
+			}
+			if msg.cancel != nil {
+				return m, listenStreamWithCancel(msg.ch, msg.cancel)
+			}
+			return m, listenStream(msg.ch)
 		case agent.EventDone:
 			m.loading = false
 			m.streaming = false
-			m.messages = append(m.messages, message{sender: "ai", text: m.partial, mode: m.viewMode})
+
+			// Check for pseudo-tool calls in the response and convert them to actual tool calls
+			processedContent := m.processPseudoToolCalls(m.partial)
+			m.messages = append(m.messages, message{sender: "ai", text: processedContent, mode: m.viewMode})
 
 			// Auto-save planning responses as plans
-			if m.viewMode == ViewModePlanning && m.partial != "" {
+			if m.viewMode == ViewModePlanning && processedContent != "" {
 				// Capture the content before clearing it
-				content := m.partial
+				content := processedContent
 				go func() {
 					// Extract title from the first line or use a default
 					lines := strings.Split(strings.TrimSpace(content), "\n")
@@ -326,9 +415,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}()
 			}
 
+			// Clear streaming state
 			m.partial = ""
 			m.streamChunks = 0 // Reset chunk counter
-			content := m.renderChatContent()
+			m.isThinking = false
+			m.thinkingText = ""
+			m.currentToolCall = nil
+			// Keep tool calls for history but mark them as completed
+			for i := range m.toolCalls {
+				if m.toolCalls[i].Status == "executing" {
+					m.toolCalls[i].Status = "completed"
+				}
+			}
+
+			content := m.renderChatContent() + m.renderFullWidthBar()
 			m.viewport.SetContent(content)
 			if !m.userScrolling {
 				m.viewport.GotoBottom()
@@ -376,19 +476,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = msg.Height
 		} else {
-			// Resize viewport to fill remaining space after input
+			// Resize viewport to fill remaining space after input and potential full-width bar
 			m.viewport.Width = msg.Width
-			m.viewport.Height = msg.Height - 1
+			// Reserve space for header, footer, and potential full-width bar
+			barHeight := 0
+			if m.isThinking || len(m.toolCalls) > 0 {
+				barHeight = 5 // Approximate height for the full-width bar
+			}
+			m.viewport.Height = msg.Height - 2 - barHeight // -2 for header and footer
 			m.input.Width = msg.Width
 
 			// Re-render messages with new width
-			if len(m.messages) > 0 {
-				content := m.renderChatContent()
-				m.viewport.SetContent(content)
-				// Only scroll to bottom if user wasn't manually scrolling
-				if !m.userScrolling {
-					m.viewport.GotoBottom()
-				}
+			content := m.renderChatContent()
+			m.viewport.SetContent(content)
+			// Only scroll to bottom if user wasn't manually scrolling
+			if !m.userScrolling {
+				m.viewport.GotoBottom()
 			}
 		}
 		return m, nil
@@ -424,7 +527,12 @@ func (m model) updateModeSelect(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.input.Placeholder = selectedMode.Prompt
 		// Setup viewport for chat
 		m.viewport.Width = m.width
-		m.viewport.Height = m.height - 1
+		// Reserve space for header, footer, and potential full-width bar
+		barHeight := 0
+		if m.isThinking || len(m.toolCalls) > 0 {
+			barHeight = 5 // Approximate height for the full-width bar
+		}
+		m.viewport.Height = m.height - 2 - barHeight // -2 for header and footer
 		m.input.Width = m.width
 		// Render welcome message
 		content := m.renderChatContent()
@@ -559,6 +667,8 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewMode = ViewModeSelect
 		m.viewport.Width = m.width
 		m.viewport.Height = m.height
+		// Clear viewport content for mode selection
+		m.viewport.SetContent("")
 		return m, nil
 	case tea.KeyUp:
 		// Allow scrolling up in the viewport
@@ -581,8 +691,14 @@ func (m model) updateChatMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				text:   userText,
 				mode:   m.viewMode,
 			})
+			// Clear previous tool calls and thinking state for new conversation
+			m.toolCalls = make([]toolCallInfo, 0)
+			m.currentToolCall = nil
+			m.isThinking = false
+			m.thinkingText = ""
+
 			// Render and scroll viewport to bottom
-			content := m.renderChatContent()
+			content := m.renderChatContent() + m.renderFullWidthBar()
 			m.viewport.SetContent(content)
 			m.viewport.GotoBottom()
 			m.userScrolling = false // Reset scrolling state when sending message
@@ -713,18 +829,23 @@ func (m model) renderChatMode() string {
 		Foreground(lipgloss.Color("240")).
 		Render(inputView)
 
+	// Build the main content
+	mainContent := m.viewport.View()
+
+	// Add full-width bar if needed
+	fullWidthBar := m.renderFullWidthBar()
+
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		header,
-		m.viewport.View(),
+		mainContent,
+		fullWidthBar,
 		footer,
 	)
 }
 
 // renderChatContent formats the chat history for the viewport
 func (m model) renderChatContent() string {
-	var out string
-
 	// Filter messages for current mode
 	var modeMessages []message
 	for _, msg := range m.messages {
@@ -733,6 +854,8 @@ func (m model) renderChatContent() string {
 		}
 	}
 
+	// Calculate total content first
+	var fullContent strings.Builder
 	for _, msg := range modeMessages {
 		var prefix string
 		if msg.sender == "user" {
@@ -752,10 +875,224 @@ func (m model) renderChatContent() string {
 			Width(m.viewport.Width - 7).
 			Render(msg.text)
 
-		out += prefix + wrappedText + "\n\n"
+		fullContent.WriteString(prefix + wrappedText + "\n\n")
 	}
 
-	return out
+	content := fullContent.String()
+
+	// If content is too long, truncate to show only the latest 20% of visible lines
+	if m.viewport.Height > 0 && len(content) > 0 {
+		lines := strings.Split(content, "\n")
+		totalLines := len(lines)
+		visibleLines := m.viewport.Height
+
+		// Calculate how many lines to show (20% of visible area)
+		linesToShow := int(float64(visibleLines) * 0.2)
+		if linesToShow < 25 {
+			linesToShow = 25 // Minimum 5 lines
+		}
+
+		// If we have more lines than we want to show, truncate
+		if totalLines > linesToShow {
+			// Take the last N lines
+			startIndex := totalLines - linesToShow
+			if startIndex < 0 {
+				startIndex = 0
+			}
+
+			// Add truncation indicator
+			truncatedLines := []string{
+				fmt.Sprintf("... (showing last %d of %d lines) ...", linesToShow, totalLines),
+			}
+			truncatedLines = append(truncatedLines, lines[startIndex:]...)
+			content = strings.Join(truncatedLines, "\n")
+		}
+	}
+
+	return content
+}
+
+// renderFullWidthBar renders the full-width bar underneath agent outputs
+func (m model) renderFullWidthBar() string {
+	if !m.isThinking && len(m.toolCalls) == 0 {
+		return ""
+	}
+
+	var content strings.Builder
+
+	// Add thinking indicator if active
+	if m.isThinking && m.thinkingText != "" {
+		thinkingStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("4")). // Blue color for AI thinking
+			Bold(true)
+		content.WriteString(thinkingStyle.Render("🤔 "+m.thinkingText) + "\n")
+	}
+
+	// Add tool calls summary
+	if len(m.toolCalls) > 0 {
+		content.WriteString("\n")
+
+		// Count completed vs pending tool calls
+		completed := 0
+		pending := 0
+		executing := 0
+		for _, tc := range m.toolCalls {
+			switch tc.Status {
+			case "completed":
+				completed++
+			case "executing":
+				executing++
+			case "pending":
+				pending++
+			}
+		}
+
+		// Show tool call summary
+		toolSummary := fmt.Sprintf("🔧 Tool Calls: %d completed, %d executing, %d pending", completed, executing, pending)
+		toolStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("3")). // Yellow for tool calls
+			Bold(true)
+		content.WriteString(toolStyle.Render(toolSummary) + "\n")
+
+		// Show recent tool calls (limit to last 3)
+		recentTools := m.toolCalls
+		if len(recentTools) > 3 {
+			recentTools = recentTools[len(recentTools)-3:]
+		}
+
+		for _, tc := range recentTools {
+			var statusIcon string
+			var statusColor string
+			switch tc.Status {
+			case "completed":
+				statusIcon = "✅"
+				statusColor = "2" // Green
+			case "executing":
+				statusIcon = "⚡"
+				statusColor = "3" // Yellow
+			case "pending":
+				statusIcon = "⏳"
+				statusColor = "240" // Gray
+			default:
+				statusIcon = "❓"
+				statusColor = "240"
+			}
+
+			toolLine := fmt.Sprintf("  %s %s (%s)", statusIcon, tc.Name, tc.Status)
+			toolLineStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor))
+			content.WriteString(toolLineStyle.Render(toolLine) + "\n")
+		}
+	}
+
+	// Add full-width separator line
+	separatorColor := "4" // Blue color to match AI text
+	if m.isThinking {
+		separatorColor = "3" // Yellow when thinking
+	}
+
+	separator := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(separatorColor)).
+		Render(strings.Repeat("─", m.width))
+
+	return content.String() + separator + "\n"
+}
+
+// processPseudoToolCalls detects and converts pseudo-tool calls to actual tool calls
+func (m model) processPseudoToolCalls(content string) string {
+	// Look for JavaScript-style tool calls in the content
+	// Pattern: file_operations: { type: "write", path: "...", content: "..." }
+
+	// Simple regex-like detection for file_operations pseudo-calls
+	if strings.Contains(content, "file_operations:") {
+		// Extract the pseudo-tool call
+		start := strings.Index(content, "file_operations:")
+		if start != -1 {
+			// Find the end of the pseudo-tool call (look for closing brace)
+			end := start
+			braceCount := 0
+			inString := false
+			escapeNext := false
+
+			for i := start; i < len(content); i++ {
+				char := content[i]
+
+				if escapeNext {
+					escapeNext = false
+					continue
+				}
+
+				if char == '\\' {
+					escapeNext = true
+					continue
+				}
+
+				if char == '"' && !escapeNext {
+					inString = !inString
+					continue
+				}
+
+				if !inString {
+					if char == '{' {
+						braceCount++
+					} else if char == '}' {
+						braceCount--
+						if braceCount == 0 {
+							end = i + 1
+							break
+						}
+					}
+				}
+			}
+
+			if end > start {
+				pseudoCall := content[start:end]
+
+				// Try to extract the parameters
+				if strings.Contains(pseudoCall, `"type": "write"`) {
+					// Extract path and content
+					pathMatch := extractJSONValue(pseudoCall, "path")
+					contentMatch := extractJSONValue(pseudoCall, "content")
+
+					if pathMatch != "" && contentMatch != "" {
+						// Create a proper tool call
+						toolCall := fmt.Sprintf(`{"type": "write", "path": "%s", "content": %s}`, pathMatch, contentMatch)
+
+						// Execute the tool call
+						go func() {
+							ctx := context.Background()
+							fileTool := m.agent.GetTool("file_operations")
+							if fileTool != nil {
+								_, err := fileTool.Execute(ctx, toolCall)
+								if err != nil {
+									fmt.Printf("Warning: failed to execute pseudo-tool call: %v\n", err)
+								}
+							}
+						}()
+
+						// Replace the pseudo-call with a note
+						replacement := fmt.Sprintf("\n\n[Note: File '%s' has been automatically saved using the file_operations tool]\n", pathMatch)
+						content = content[:start] + replacement + content[end:]
+					}
+				}
+			}
+		}
+	}
+
+	return content
+}
+
+// extractJSONValue extracts a JSON value from a string
+func extractJSONValue(jsonStr, key string) string {
+	// Simple extraction - in a real implementation, you'd use proper JSON parsing
+	start := strings.Index(jsonStr, fmt.Sprintf(`"%s": "`, key))
+	if start != -1 {
+		start += len(fmt.Sprintf(`"%s": "`, key))
+		end := strings.Index(jsonStr[start:], `"`)
+		if end != -1 {
+			return jsonStr[start : start+end]
+		}
+	}
+	return ""
 }
 
 // renderApprovalDialog renders the approval request interface

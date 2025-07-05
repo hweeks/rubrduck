@@ -742,3 +742,8 @@ func (a *Agent) ClearHistory() {
 func (a *Agent) GetHistory() []ai.Message {
 	return a.history
 }
+
+// GetTool returns a tool by name
+func (a *Agent) GetTool(name string) Tool {
+	return a.tools[name]
+}

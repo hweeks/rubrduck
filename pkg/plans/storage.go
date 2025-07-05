@@ -30,15 +30,7 @@ func (fs *FileStorage) Initialize() error {
 		return fmt.Errorf("failed to create base directory: %w", err)
 	}
 
-	// Create mode-specific subdirectories
-	for _, mode := range SupportedModes {
-		modeDir := filepath.Join(fs.baseDir, mode)
-		if err := os.MkdirAll(modeDir, 0755); err != nil {
-			return fmt.Errorf("failed to create mode directory %s: %w", mode, err)
-		}
-	}
-
-	// Create metadata directory for plan metadata
+	// Create metadata directory for plan metadata and content
 	metadataDir := filepath.Join(fs.baseDir, ".metadata")
 	if err := os.MkdirAll(metadataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create metadata directory: %w", err)
